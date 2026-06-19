@@ -1,117 +1,122 @@
-using System;
 using FlappyBird.Models;
 
 namespace FlappyBird.Game
 {
-    /// <summary>
-    /// Base class cho các chế độ chơi
-    /// </summary>
     public abstract class GameModeBase : IGameMode
     {
         protected bool shouldExit = false;
         protected readonly Random Random = new();
-        
+
         public abstract void Initialize();
         public abstract void Update();
         public abstract void Render();
         public abstract void HandleInput(ConsoleKeyInfo keyInfo);
         public abstract bool IsGameOver();
-        
+
         public virtual void Cleanup()
         {
             shouldExit = false;
         }
-        
+
         /// <summary>
-        /// Common physics update for bird
+        /// Vật lý chim theo delta time – ổn định trên mọi frame rate.
+        /// BirdYf là vị trí float; BirdY (int) dùng cho render/collision.
         /// </summary>
-        protected void UpdateBirdPhysics(GameState gameState)
+        protected void UpdateBirdPhysics(GameState gs)
         {
-            // Vật lý chim chuẩn
-            gameState.BirdVelocity += GameState.Gravity;
-            
-            // Giới hạn tốc độ rơi tối đa
-            if (gameState.BirdVelocity > GameState.MaxFallSpeed)
+            float s = GameTiming.Scale; // 1.0 tại 60fps
+
+            gs.BirdVelocity += GameState.Gravity * s;
+            if (gs.BirdVelocity > GameState.MaxFallSpeed)
+                gs.BirdVelocity = GameState.MaxFallSpeed;
+
+            gs.BirdYf += gs.BirdVelocity * s;
+
+            // Biên trên
+            if (gs.BirdYf < 1f)
             {
-                gameState.BirdVelocity = GameState.MaxFallSpeed;
+                gs.BirdYf = 1f;
+                gs.BirdVelocity = 0f;
             }
-            
-            gameState.BirdY += (int)Math.Round(gameState.BirdVelocity);
-            
-            // Kiểm tra biên
-            if (gameState.BirdY < 1) 
+
+            gs.BirdY = (int)Math.Round(gs.BirdYf);
+
+            // Biên dưới – game over
+            if (gs.BirdY >= GameState.GameHeight - 1)
             {
-                gameState.BirdY = 1;
-                gameState.BirdVelocity = 0;
-            }
-            
-            if (gameState.BirdY >= GameState.GameHeight - 1)
-            {
-                gameState.GameOver = true;
-                return;
+                gs.BirdY = GameState.GameHeight - 1;
+                gs.GameOver = true;
             }
         }
-        
+
         /// <summary>
-        /// Common pipes update
+        /// Di chuyển ống theo bộ tích lũy thời gian – thay thế FrameCounter%PipeSpeed.
+        /// Ống di chuyển 1 char mỗi (PipeSpeed/60) giây, bất kể frame rate.
         /// </summary>
-        protected void UpdatePipes(GameState gameState)
+        protected void UpdatePipes(GameState gs)
         {
-            if (gameState.FrameCounter % gameState.PipeSpeed == 0)
+            float pipeInterval = gs.PipeSpeed / 60.0f; // giây giữa mỗi lần dịch 1 char
+            gs.PipeTimeAccumulator += GameTiming.DeltaTime;
+
+            while (gs.PipeTimeAccumulator >= pipeInterval)
             {
-                for (int i = gameState.Pipes.Count - 1; i >= 0; i--)
+                gs.PipeTimeAccumulator -= pipeInterval;
+
+                for (int i = gs.Pipes.Count - 1; i >= 0; i--)
                 {
-                    gameState.Pipes[i].X--;
-                    
-                    if (gameState.Pipes[i].X < -2)
+                    gs.Pipes[i].X--;
+
+                    if (gs.Pipes[i].X < -2)
                     {
-                        gameState.Pipes.RemoveAt(i);
-                        gameState.Score++;
+                        gs.Pipes.RemoveAt(i);
+                        gs.Score++;
                     }
                 }
-                
-                if (gameState.Pipes.Count == 0 || gameState.Pipes[gameState.Pipes.Count - 1].X < GameState.GameWidth - GameState.PipeSpacing)
+
+                // Spawn ống mới nếu cần
+                if (gs.Pipes.Count == 0 ||
+                    gs.Pipes[gs.Pipes.Count - 1].X < GameState.GameWidth - GameState.PipeSpacing)
                 {
-                    int currentGapSize = gameState.GetCurrentGapSize();
-                    gameState.Pipes.Add(new Pipe(GameState.GameWidth - 1, currentGapSize, GameState.GameHeight, Random));
+                    gs.Pipes.Add(new Pipe(GameState.GameWidth - 1,
+                        gs.GetCurrentGapSize(), GameState.GameHeight, Random));
                 }
             }
         }
-        
+
         /// <summary>
-        /// Common collision detection
+        /// Kiểm tra va chạm – chỉ kiểm tra ống gần chim (không scan toàn bản đồ mỗi frame)
         /// </summary>
-        protected void CheckCollision(GameState gameState)
+        protected void CheckCollision(GameState gs)
         {
-            foreach (var pipe in gameState.Pipes)
+            int bx = GameState.BirdX;
+            int by = gs.BirdY;
+
+            foreach (var pipe in gs.Pipes)
             {
-                if (GameState.BirdX >= pipe.X - 1 && GameState.BirdX <= pipe.X + 1)
+                // Bỏ qua ống đã qua
+                if (pipe.X < bx - 2) continue;
+                // Bỏ qua ống chưa đến gần
+                if (pipe.X > bx + 2) break;
+
+                if (by <= pipe.TopHeight || by >= GameState.GameHeight - pipe.BottomHeight - 1)
                 {
-                    if (gameState.BirdY <= pipe.TopHeight || gameState.BirdY >= GameState.GameHeight - pipe.BottomHeight - 1)
-                    {
-                        gameState.GameOver = true;
-                        return;
-                    }
+                    gs.GameOver = true;
+                    return;
                 }
             }
-            
-            if (gameState.BirdY <= 0 || gameState.BirdY >= GameState.GameHeight - 1)
-            {
-                gameState.GameOver = true;
-            }
+
+            if (by <= 0 || by >= GameState.GameHeight - 1)
+                gs.GameOver = true;
         }
-        
-        /// <summary>
-        /// Common jump logic
-        /// </summary>
-        protected void Jump(GameState gameState)
+
+        protected void Jump(GameState gs)
         {
-            if (!gameState.GameStarted)
-            {
-                gameState.GameStarted = true;
-            }
-            
-            gameState.BirdVelocity = GameState.JumpStrength;
+            if (!gs.GameStarted)
+                gs.GameStarted = true;
+
+            gs.BirdVelocity = GameState.JumpStrength;
+            // Sync BirdYf để tránh float drift sau jump
+            gs.BirdYf = gs.BirdY;
         }
     }
 }

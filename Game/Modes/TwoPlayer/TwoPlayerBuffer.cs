@@ -1,98 +1,116 @@
-using System;
+using System.Text;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Quản lý double buffering cho TwoPlayerGameMode để tránh flicker
+    /// Double-buffer chống flicker cho TwoPlayer.
+    /// Flush() gom các char liên tiếp cùng màu thành một Console.Write(string)
+    /// thay vì gọi SetCursorPosition cho từng char riêng lẻ.
     /// </summary>
     public class TwoPlayerBuffer
     {
-        // === CONSTANTS ===
         public const int MENU_BORDER_WIDTH = 66;
         public const int TOTAL_DISPLAY_HEIGHT = 36;
 
-        // === BUFFERING ARRAYS ===
-        private char[,] previousBuffer = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-        private char[,] currentBuffer = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-        private ConsoleColor[,] previousColorBuffer = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-        private ConsoleColor[,] currentColorBuffer = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-        
+        private char[,] _prev = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+        private char[,] _cur = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+        private ConsoleColor[,] _prevFg = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+        private ConsoleColor[,] _curFg = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+
+        // Pre-allocated StringBuilder – không new mỗi frame
+        private readonly StringBuilder _sb = new(MENU_BORDER_WIDTH);
+
         public bool BufferInitialized { get; private set; } = false;
 
-        /// <summary>
-        /// Initialize double buffering arrays to reduce flicker
-        /// </summary>
         public void InitializeBuffers()
         {
-            previousBuffer = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-            currentBuffer = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-            previousColorBuffer = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
-            currentColorBuffer = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+            _prev = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+            _cur = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+            _prevFg = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
+            _curFg = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
 
-            // Initialize with spaces and default color
             for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
-            {
                 for (int x = 0; x < MENU_BORDER_WIDTH; x++)
                 {
-                    previousBuffer[y, x] = ' ';
-                    currentBuffer[y, x] = ' ';
-                    previousColorBuffer[y, x] = ConsoleColor.White;
-                    currentColorBuffer[y, x] = ConsoleColor.White;
+                    _prev[y, x] = '\0'; // force full redraw lần đầu
+                    _cur[y, x] = ' ';
+                    _prevFg[y, x] = ConsoleColor.White;
+                    _curFg[y, x] = ConsoleColor.White;
                 }
-            }
 
             BufferInitialized = true;
         }
 
-        /// <summary>
-        /// Clear current buffer for next frame
-        /// </summary>
         public void ClearCurrentBuffer()
         {
             for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
-            {
                 for (int x = 0; x < MENU_BORDER_WIDTH; x++)
                 {
-                    currentBuffer[y, x] = ' ';
-                    currentColorBuffer[y, x] = ConsoleColor.White;
+                    _cur[y, x] = ' ';
+                    _curFg[y, x] = ConsoleColor.White;
                 }
-            }
         }
 
-        /// <summary>
-        /// Write character to current buffer
-        /// </summary>
-        public void WriteToBuffer(int x, int y, char ch, ConsoleColor color = ConsoleColor.White)
+        public void WriteToBuffer(int x, int y, char ch, ConsoleColor fg = ConsoleColor.White)
         {
-            if (x >= 0 && x < MENU_BORDER_WIDTH && y >= 0 && y < TOTAL_DISPLAY_HEIGHT)
+            if ((uint)x < MENU_BORDER_WIDTH && (uint)y < TOTAL_DISPLAY_HEIGHT)
             {
-                currentBuffer[y, x] = ch;
-                currentColorBuffer[y, x] = color;
+                _cur[y, x] = ch;
+                _curFg[y, x] = fg;
             }
         }
 
         /// <summary>
-        /// Render buffer to console - only draw changed characters
+        /// Flush diff: mỗi row quét một lần, gom run liên tiếp cùng màu vào
+        /// một Console.Write(string). Giảm số lần gọi SetCursorPosition từ
+        /// O(changed_cells) xuống còn O(changed_runs_per_row).
         /// </summary>
         public void FlushBufferToConsole()
         {
             for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
             {
-                for (int x = 0; x < MENU_BORDER_WIDTH; x++)
+                int x = 0;
+                while (x < MENU_BORDER_WIDTH)
                 {
-                    if (currentBuffer[y, x] != previousBuffer[y, x] ||
-                        currentColorBuffer[y, x] != previousColorBuffer[y, x])
+                    // Bỏ qua cell không đổi
+                    if (_cur[y, x] == _prev[y, x] && _curFg[y, x] == _prevFg[y, x])
                     {
-                        Console.SetCursorPosition(x, y);
-                        Console.ForegroundColor = currentColorBuffer[y, x];
-                        Console.Write(currentBuffer[y, x]);
-
-                        // Update previous buffer
-                        previousBuffer[y, x] = currentBuffer[y, x];
-                        previousColorBuffer[y, x] = currentColorBuffer[y, x];
+                        x++;
+                        continue;
                     }
+
+                    // Bắt đầu run – đặt cursor một lần cho cả run
+                    Console.SetCursorPosition(x, y);
+                    ConsoleColor activeColor = _curFg[y, x];
+                    Console.ForegroundColor = activeColor;
+                    _sb.Clear();
+
+                    while (x < MENU_BORDER_WIDTH)
+                    {
+                        bool changed = _cur[y, x] != _prev[y, x] || _curFg[y, x] != _prevFg[y, x];
+                        if (!changed) break; // kết thúc run khi gặp cell không đổi
+
+                        ConsoleColor fg = _curFg[y, x];
+                        if (fg != activeColor)
+                        {
+                            // Màu khác – flush run hiện tại rồi bắt đầu run màu mới
+                            Console.Write(_sb.ToString());
+                            _sb.Clear();
+                            activeColor = fg;
+                            Console.ForegroundColor = activeColor;
+                        }
+
+                        _sb.Append(_cur[y, x]);
+                        _prev[y, x] = _cur[y, x];
+                        _prevFg[y, x] = _curFg[y, x];
+                        x++;
+                    }
+
+                    if (_sb.Length > 0)
+                        Console.Write(_sb.ToString());
                 }
             }
+
             Console.ResetColor();
         }
     }

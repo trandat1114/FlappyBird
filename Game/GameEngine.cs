@@ -1,12 +1,8 @@
-using System;
-using System.Threading;
+using System.Diagnostics;
 using FlappyBird.Enum;
 
 namespace FlappyBird.Game
 {
-    /// <summary>
-    /// Game Engine Manager - quản lý các chế độ chơi khác nhau
-    /// </summary>
     public static class GameEngine
     {
         private static IGameMode? currentGameMode;
@@ -14,75 +10,73 @@ namespace FlappyBird.Game
         private static Thread? inputThread;
         private static volatile bool isRunning = false;
 
-        /// <summary>
-        /// Khởi động game với chế độ chơi được chỉ định
-        /// </summary>
         public static void StartGame(GameMode gameMode)
         {
-            //clear screen and reset console settings
             Console.Clear();
             Console.ResetColor();
             Console.SetCursorPosition(0, 0);
-            
 
-
-            // Tạo game mode instance
             currentGameMode = GameModeFactory.CreateGameMode(gameMode);
             currentGameMode.Initialize();
 
-            // Bắt đầu game loop
             isRunning = true;
-
-            gameThread = new Thread(GameLoop);
-            inputThread = new Thread(InputLoop);
+            gameThread = new Thread(GameLoop) { IsBackground = true };
+            inputThread = new Thread(InputLoop) { IsBackground = true };
 
             gameThread.Start();
             inputThread.Start();
 
-            // Đợi threads kết thúc
             gameThread.Join();
             inputThread.Join();
 
-            // Cleanup
             currentGameMode.Cleanup();
         }
 
-        /// <summary>
-        /// Dừng game hiện tại
-        /// </summary>
-        public static void StopGame()
-        {
-            isRunning = false;
-        }
+        public static void StopGame() => isRunning = false;
 
         /// <summary>
-        /// Game loop chính
+        /// Game loop với delta time chuẩn xác.
+        /// Dùng Stopwatch độ phân giải cao, hybrid sleep/spinwait để đạt đúng 60fps
+        /// mà không chiếm quá nhiều CPU.
         /// </summary>
         private static void GameLoop()
         {
-            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-            long lastFrameTime = 0;
-            const long targetFrameTime = 16; // 60 FPS
+            var sw = Stopwatch.StartNew();
+            long lastTicks = sw.ElapsedTicks;
+            long targetTicks = Stopwatch.Frequency / 60; // ticks per frame tại 60fps
+            long spinThresholdTicks = Stopwatch.Frequency / 400; // ~2.5ms – chuyển sang spinwait
 
             while (isRunning && currentGameMode != null && !currentGameMode.IsGameOver())
             {
-                long currentTime = stopwatch.ElapsedMilliseconds;
+                long now = sw.ElapsedTicks;
+                long elapsed = now - lastTicks;
 
-                if (currentTime - lastFrameTime >= targetFrameTime)
+                if (elapsed >= targetTicks)
                 {
+                    // Tính deltaTime (giây), giới hạn ở 50ms để tránh spiral-of-death
+                    float dt = Math.Min((float)elapsed / Stopwatch.Frequency, 0.05f);
+                    GameTiming.DeltaTime = dt;
+
                     currentGameMode.Update();
                     currentGameMode.Render();
-                    lastFrameTime = currentTime;
+                    lastTicks = now;
                 }
-
-                Thread.Sleep(1);
+                else
+                {
+                    long remaining = targetTicks - (sw.ElapsedTicks - lastTicks);
+                    if (remaining > spinThresholdTicks)
+                        Thread.Sleep(1); // yield CPU khi còn thời gian đáng kể
+                    else
+                        Thread.SpinWait(50); // busy-wait ngắn cho độ chính xác cao
+                }
             }
 
             isRunning = false;
         }
 
         /// <summary>
-        /// Input handling loop
+        /// Input loop tách riêng – 5ms sleep giảm latency từ 10ms xuống còn ~5ms
+        /// mà vẫn không block game loop.
         /// </summary>
         private static void InputLoop()
         {
@@ -90,11 +84,10 @@ namespace FlappyBird.Game
             {
                 if (Console.KeyAvailable)
                 {
-                    var keyInfo = Console.ReadKey(true);
-                    currentGameMode.HandleInput(keyInfo);
+                    var key = Console.ReadKey(true);
+                    currentGameMode.HandleInput(key);
                 }
-
-                Thread.Sleep(10);
+                Thread.Sleep(5);
             }
         }
     }

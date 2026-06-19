@@ -1,358 +1,236 @@
-using System;
+using FlappyBird.Localization;
 using FlappyBird.Models;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Xử lý rendering cho TwoPlayerGameMode
+    /// Renderer cho TwoPlayer – cùng bảng ký tự và kỹ thuật SinglePlayerRenderer:
+    ///   • Pre-allocated buffers, Buffer.BlockCopy background
+    ///   • Ống cap ▀/▄, thân 3-col
+    ///   • Chim ♦/^/v + cánh ~/_
+    ///   • Màu nhất quán: Cyan=viền, Green=ống, Yellow=chim, DarkGray=nền
     /// </summary>
-    public class TwoPlayerRenderer(TwoPlayerBuffer buffer)
+    public class TwoPlayerRenderer
     {
-        // === CONSTANTS ===
-        private const int MENU_BORDER_WIDTH = 66;
-        private const int GAME_DISPLAY_HEIGHT = 11;
-        private const int PLAYER_SCREEN_HEIGHT = 15;
-        private const int FOOTER_HEIGHT = 6;
-        private const int TOTAL_DISPLAY_HEIGHT = 36;
+        // ── LAYOUT ──────────────────────────────────────────────────────────
+        private const int BORDER_W = 66;
+        private const int GAME_DISPLAY_H = 11;      // nén từ 22 game rows
+        private const int GAME_CONTENT_W = BORDER_W - 2; // 64
+        private const int PANEL_H = 15;             // header(3) + game(11) + border(1)
+        private const int TOTAL_H = 36;             // 2*PANEL_H + footer(6)
 
-        private readonly TwoPlayerBuffer buffer = buffer;
+        // ── CHARACTERS ──────────────────────────────────────────────────────
+        private const char PipeChar = '█';
+        private const char BirdChar = '♦';
+        private const char BgDot = '·';
 
-        /// <summary>
-        /// Render hai màn hình game xếp chồng vào buffer - tối ưu cho anti-flicker
-        /// </summary>
-        public void RenderDualStackedScreensToBuffer(GameState player1State, GameState player2State)
+        private readonly TwoPlayerBuffer _buf;
+
+        // Pre-allocated game content buffers – không new mỗi frame
+        private readonly char[,] _p1 = new char[GAME_DISPLAY_H, GAME_CONTENT_W];
+        private readonly char[,] _p2 = new char[GAME_DISPLAY_H, GAME_CONTENT_W];
+        private readonly char[,] _bg = new char[GAME_DISPLAY_H, GAME_CONTENT_W];
+
+        public TwoPlayerRenderer(TwoPlayerBuffer buf)
         {
-            // === PLAYER 1 SCREEN ===
-            RenderPlayerScreenToBuffer(player1State, "PLAYER 1", 0);
-
-            // === PLAYER 2 SCREEN ===  
-            RenderPlayerScreenToBuffer(player2State, "PLAYER 2", PLAYER_SCREEN_HEIGHT);
+            _buf = buf;
+            // Pre-compute background một lần – BlockCopy vào p1/p2 mỗi frame thay vì loop
+            for (int y = 0; y < GAME_DISPLAY_H; y++)
+                for (int x = 0; x < GAME_CONTENT_W; x++)
+                    _bg[y, x] = (x + y) % 8 == 0 ? BgDot : ' ';
         }
 
-        /// <summary>
-        /// Render một màn hình player vào buffer tại vị trí chỉ định (giống SinglePlayer)
-        /// </summary>
-        public void RenderPlayerScreenToBuffer(GameState playerState, string playerName, int startY)
+        // ── PUBLIC API ───────────────────────────────────────────────────────
+
+        public void RenderDualStackedScreensToBuffer(GameState p1, GameState p2)
         {
-            // Header
-            buffer.WriteToBuffer(0, startY, '╔', ConsoleColor.Cyan);
-            for (int i = 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, startY, '═', ConsoleColor.Cyan);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, startY, '╗', ConsoleColor.Cyan);
-            
-            // Info line
-            string info = $" {playerName} | Score: {playerState.Score} {(playerState.GameOver ? "(GAME OVER)" : "")}";
-            buffer.WriteToBuffer(0, startY + 1, '║', ConsoleColor.Cyan);
-            for (int i = 0; i < info.Length && i < MENU_BORDER_WIDTH - 2; i++)
-                buffer.WriteToBuffer(i + 1, startY + 1, info[i], ConsoleColor.White);
-            for (int i = info.Length + 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, startY + 1, ' ', ConsoleColor.White);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, startY + 1, '║', ConsoleColor.Cyan);
-            
-            // Border dưới info
-            buffer.WriteToBuffer(0, startY + 2, '╠', ConsoleColor.Cyan);
-            for (int i = 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, startY + 2, '═', ConsoleColor.Cyan);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, startY + 2, '╣', ConsoleColor.Cyan);
-            
-            // Game area
-            char[,] screenBuffer = new char[GAME_DISPLAY_HEIGHT, GameState.GameWidth - 2];
-            for (int y = 0; y < GAME_DISPLAY_HEIGHT; y++)
-                for (int x = 0; x < GameState.GameWidth - 2; x++)
-                    screenBuffer[y, x] = ((x + y) % 4 == 0) ? '·' : ' ';
-            
-            DrawPipesIntoBuffer(screenBuffer, playerState);
-            DrawBirdIntoBuffer(screenBuffer, playerState);
-            
-            for (int y = 0; y < GAME_DISPLAY_HEIGHT; y++)
-            {
-                buffer.WriteToBuffer(0, startY + 3 + y, '║', ConsoleColor.Cyan);
-                for (int x = 0; x < GameState.GameWidth - 2; x++)
-                {
-                    char ch = screenBuffer[y, x];
-                    ConsoleColor color = GetCharColor(ch);
-                    buffer.WriteToBuffer(x + 1, startY + 3 + y, ch, color);
-                }
-                buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, startY + 3 + y, '║', ConsoleColor.Cyan);
-            }
-            
-            // Bottom border
-            buffer.WriteToBuffer(0, startY + 3 + GAME_DISPLAY_HEIGHT, '╚', ConsoleColor.Cyan);
-            for (int i = 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, startY + 3 + GAME_DISPLAY_HEIGHT, '═', ConsoleColor.Cyan);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, startY + 3 + GAME_DISPLAY_HEIGHT, '╝', ConsoleColor.Cyan);
+            RenderPlayerPanel(p1, "PLAYER 1", 0, _p1);
+            RenderPlayerPanel(p2, "PLAYER 2", PANEL_H, _p2);
         }
 
-        /// <summary>
-        /// Render footer với 2 khung riêng biệt cho điểm số và hướng dẫn
-        /// </summary>
-        public void RenderDualPlayerFooterToBuffer(GameState player1State, GameState player2State)
+        public void RenderDualPlayerFooterToBuffer(GameState p1, GameState p2)
         {
-            int footerY = TOTAL_DISPLAY_HEIGHT - FOOTER_HEIGHT; // Bắt đầu footer từ vị trí chính xác
-
-            // === KHUNG ĐIỂM SỐ ===
-            // Viền trên khung điểm số
-            buffer.WriteToBuffer(0, footerY, '╔', ConsoleColor.Yellow);
-            for (int i = 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, footerY, '═', ConsoleColor.Yellow);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, footerY, '╗', ConsoleColor.Yellow);
-
-            // Nội dung điểm số
-            buffer.WriteToBuffer(0, footerY + 1, '║', ConsoleColor.Yellow);
-            string scoreLine = $" ĐIỂM SỐ: Player 1: {player1State.Score} {(player1State.GameOver ? "(THUA)" : "")} | Player 2: {player2State.Score} {(player2State.GameOver ? "(THUA)" : "")}";
-            for (int i = 0; i < scoreLine.Length && i < MENU_BORDER_WIDTH - 2; i++)
-                buffer.WriteToBuffer(i + 1, footerY + 1, scoreLine[i], ConsoleColor.White);
-            for (int i = scoreLine.Length + 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, footerY + 1, ' ', ConsoleColor.White);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, footerY + 1, '║', ConsoleColor.Yellow);
-
-            // Viền dưới khung điểm số / viền trên khung hướng dẫn
-            buffer.WriteToBuffer(0, footerY + 2, '╠', ConsoleColor.Cyan);
-            for (int i = 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, footerY + 2, '═', ConsoleColor.Cyan);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, footerY + 2, '╣', ConsoleColor.Cyan);
-
-            // === KHUNG HƯỚNG DẪN ===
-            // Nội dung hướng dẫn
-            buffer.WriteToBuffer(0, footerY + 3, '║', ConsoleColor.Cyan);
-            string controlsLine_1 = " ĐIỀU KHIỂN: [W] Player 1 bay | [↑] Player 2 bay";
-            string controlsLine_2 = " PHÍM LỆNH : [ESC] Thoát | [SPACE] Bắt đầu/Chơi lại";
-            for (int i = 0; i < controlsLine_1.Length && i < MENU_BORDER_WIDTH - 2; i++)
-                buffer.WriteToBuffer(i + 1, footerY + 3, controlsLine_1[i], ConsoleColor.Gray);
-            for (int i = controlsLine_1.Length + 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, footerY + 3, ' ', ConsoleColor.Gray);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, footerY + 3, '║', ConsoleColor.Cyan);
-
-            // Line 2 hướng dẫn
-            buffer.WriteToBuffer(0, footerY + 4, '║', ConsoleColor.Cyan);
-            for (int i = 0; i < controlsLine_2.Length && i < MENU_BORDER_WIDTH - 2; i++)
-                buffer.WriteToBuffer(i + 1, footerY + 4, controlsLine_2[i], ConsoleColor.Gray);
-            for (int i = controlsLine_2.Length + 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, footerY + 4, ' ', ConsoleColor.Gray);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, footerY + 4, '║', ConsoleColor.Cyan);
-
-            // Viền dưới khung hướng dẫn
-            buffer.WriteToBuffer(0, footerY + 5, '╚', ConsoleColor.Cyan);
-            for (int i = 1; i < MENU_BORDER_WIDTH - 1; i++)
-                buffer.WriteToBuffer(i, footerY + 5, '═', ConsoleColor.Cyan);
-            buffer.WriteToBuffer(MENU_BORDER_WIDTH - 1, footerY + 5, '╝', ConsoleColor.Cyan);
+            int fy = TOTAL_H - 6;
+            WriteBorder(fy, '╔', '═', '╗', ConsoleColor.Yellow);
+            WriteInfo(fy + 1, BuildScoreLine(p1, p2), ConsoleColor.White, ConsoleColor.Yellow);
+            WriteBorder(fy + 2, '╠', '═', '╣', ConsoleColor.Cyan);
+            WriteInfo(fy + 3,
+                $" {L.Get(L.TP_JUMP_P1)}  │  {L.Get(L.TP_JUMP_P2)}  │  [ESC] {L.Get(L.CTRL_EXIT)[5..]}",
+                ConsoleColor.Gray, ConsoleColor.Cyan);
+            WriteInfo(fy + 4,
+                $" {L.Get(L.TP_START_RESTART)}",
+                ConsoleColor.Gray, ConsoleColor.Cyan);
+            WriteBorder(fy + 5, '╚', '═', '╝', ConsoleColor.Cyan);
         }
 
-        /// <summary>
-        /// Hiển thị overlay GAME OVER vào buffer
-        /// </summary>
+        /// <summary>Flash "GAME OVER" tại ranh giới giữa 2 panel (trước khi menu hiện)</summary>
         public void RenderGameOverOverlayToBuffer()
         {
-            string gameOverText = " GAME OVER! ";
-            int startX = GameState.GameWidth / 2 - gameOverText.Length / 2;
-            int overlayY = PLAYER_SCREEN_HEIGHT;
-
-            for (int i = 0; i < gameOverText.Length; i++)
-            {
-                buffer.WriteToBuffer(startX + i, overlayY, gameOverText[i], ConsoleColor.Red);
-            }
+            const string txt = "  *** GAME OVER! ***  ";
+            int sx = (BORDER_W - txt.Length) / 2;
+            for (int x = 0; x < BORDER_W; x++)
+                _buf.WriteToBuffer(x, PANEL_H, ' ', ConsoleColor.Red);
+            for (int i = 0; i < txt.Length; i++)
+                _buf.WriteToBuffer(sx + i, PANEL_H, txt[i], ConsoleColor.Red);
         }
 
-        /// <summary>
-        /// Hiển thị hiệu ứng countdown đặc biệt ở giữa mỗi màn hình player (giống đua xe)
-        /// </summary>
-        public void RenderCountdownOverlayToBuffer(int countdownValue)
+        public void RenderCountdownOverlayToBuffer(int value)
         {
-            // Tính vị trí trung tâm cho mỗi player
-            int centerX = MENU_BORDER_WIDTH / 2;
-            int centerY1 = PLAYER_SCREEN_HEIGHT / 2 + 1;
-            int centerY2 = PLAYER_SCREEN_HEIGHT + (PLAYER_SCREEN_HEIGHT / 2) + 1;
-
-            // Hiệu ứng số lớn
-            string[] bigNumbers = new string[4];
-            ConsoleColor color = ConsoleColor.Yellow;
-            string display = countdownValue > 0 ? countdownValue.ToString() : "GO!";
-
-            if (countdownValue == 3)
+            // 5-row compact digits – khớp chiều cao GAME_DISPLAY_H=11
+            string[] digit = value switch
             {
-                bigNumbers = [
-                    "  █████  ",
-                    " ██   ██ ",
-                    "      ██ ",
-                    "    ███   ",
-                    "      ██  ",
-                    " ██   ██ ",
-                    "  █████  "
-                ];
-                color = ConsoleColor.Yellow;
-            }
-            else if (countdownValue == 2)
-            {
-                bigNumbers = [
-                    "  █████  ",
-                    " ██   ██ ",
-                    "      ██ ",
-                    "   ███   ",
-                    "  ██     ",
-                    " ██      ",
-                    " ███████ "
-                ];
-                color = ConsoleColor.Yellow;
-            }
-            else if (countdownValue == 1)
-            {
-                bigNumbers = [
-                    "    ██   ",
-                    "   ███   ",
-                    "  ████   ",
-                    "    ██   ",
-                    "    ██   ",
-                    "    ██   ",
-                    "  ██████ "
-                ];
-                // Nhấp nháy đỏ vàng
-                color = (DateTime.Now.Millisecond < 500) ? ConsoleColor.Red : ConsoleColor.Yellow;
-            }
-            else // GO!
-            {
-                bigNumbers = [
-                    "  █████   ██████  ",
-                    " ██   ██ ██    ██ ",
-                    " ██   ██ ██    ██ ",
-                    " ██   ██ ██    ██ ",
-                    " ██   ██ ██    ██ ",
-                    " ██   ██ ██    ██ ",
-                    "  █████   ██████  "
-                ];
-                color = ConsoleColor.Green;
-            }
-
-            // Vẽ cho cả 2 player
-            void DrawBigNumber(int centerY)
-            {
-                int startY = centerY - bigNumbers.Length / 2;
-                int startX = centerX - bigNumbers[0].Length / 2;
-                for (int row = 0; row < bigNumbers.Length; row++)
-                {
-                    for (int col = 0; col < bigNumbers[row].Length; col++)
-                    {
-                        char ch = bigNumbers[row][col];
-                        if (ch != ' ')
-                        {
-                            buffer.WriteToBuffer(startX + col, startY + row, ch, color);
-                        }
-                    }
-                }
-            }
-            DrawBigNumber(centerY1);
-            DrawBigNumber(centerY2);
-        }
-
-        /// <summary>
-        /// Get color for character - similar to SetCharColor but returns color instead of setting it
-        /// </summary>
-        private ConsoleColor GetCharColor(char ch)
-        {
-            return ch switch
-            {
-                '█' => ConsoleColor.Green,
-                'o' or 'Ø' or '◊' => ConsoleColor.Yellow,
-                '·' => ConsoleColor.DarkGray,
-                _ => ConsoleColor.White
+                3 => ["  ████", "     █", "  ████", "     █", "  ████"],
+                2 => [" █████", "     █", " █████", " █    ", " █████"],
+                1 => ["  ██  ", "   █  ", "   █  ", "   █  ", " █████"],
+                _ => [" ████ ", " █  █ ", " ████ ", " █  █ ", " ████ "]
             };
+            ConsoleColor color = value == 1
+                ? (DateTime.Now.Millisecond < 500 ? ConsoleColor.Red : ConsoleColor.Yellow)
+                : value <= 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
+
+            OverlayDigit(digit, 3, color);              // P1 game area từ row 3
+            OverlayDigit(digit, PANEL_H + 3, color);    // P2 game area từ row PANEL_H+3
+        }
+
+        // ── PRIVATE – PANEL ──────────────────────────────────────────────────
+
+        private void RenderPlayerPanel(GameState gs, string label, int panelY, char[,] gameBuf)
+        {
+            WriteBorder(panelY, '╔', '═', '╗', ConsoleColor.Cyan);
+            string info = gs.GameOver
+                ? $" {label}  │  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  [{L.Get(L.TP_OUT)}]"
+                : $" {label}  │  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}";
+            WriteInfo(panelY + 1, info, ConsoleColor.White, ConsoleColor.Cyan);
+            WriteBorder(panelY + 2, '╠', '═', '╣', ConsoleColor.Cyan);
+
+            BuildGameContent(gameBuf, gs);
+            FlushContent(gameBuf, panelY + 3);
+
+            WriteBorder(panelY + 3 + GAME_DISPLAY_H, '╚', '═', '╝', ConsoleColor.Cyan);
         }
 
         /// <summary>
-        /// Vẽ pipes vào buffer - logic từ GameRenderer
+        /// Xây dựng nội dung game vào buffer char[11][64]:
+        ///   1) BlockCopy background  2) Vẽ ống  3) Vẽ chim
         /// </summary>
-        private void DrawPipesIntoBuffer(char[,] buffer, GameState playerState)
+        private void BuildGameContent(char[,] buf, GameState gs)
         {
-            foreach (var pipe in playerState.Pipes)
+            // 1. Background từ pre-computed (một lần copy, không loop)
+            Buffer.BlockCopy(_bg, 0, buf, 0, GAME_DISPLAY_H * GAME_CONTENT_W * sizeof(char));
+
+            // 2. Pipes – cùng chất lượng SinglePlayer nhưng scale Y 22→11
+            foreach (var pipe in gs.Pipes)
             {
-                DrawSinglePipeIntoBuffer(buffer, pipe);
+                int cx = pipe.X - 1;
+                if (cx < 0 || cx >= GAME_CONTENT_W) continue;
+
+                int topH = ScaleY(pipe.TopHeight);
+                int botCap = ScaleY(GameState.GameHeight - pipe.BottomHeight - 1);
+
+                // Thân ống trên
+                for (int y = 0; y < topH && y < GAME_DISPLAY_H; y++)
+                    DrawPipeRow(buf, y, cx);
+                // Cap ống trên ▀
+                if (topH < GAME_DISPLAY_H)
+                    DrawCapRow(buf, topH, cx, '▀');
+                // Cap ống dưới ▄
+                if (botCap > topH && botCap < GAME_DISPLAY_H)
+                    DrawCapRow(buf, botCap, cx, '▄');
+                // Thân ống dưới
+                for (int y = botCap + 1; y < GAME_DISPLAY_H; y++)
+                    DrawPipeRow(buf, y, cx);
             }
-        }
 
-        /// <summary>
-        /// Vẽ một pipe vào buffer - logic từ GameRenderer 
-        /// </summary>
-        private void DrawSinglePipeIntoBuffer(char[,] buffer, Pipe pipe)
-        {
-            // Scale pipe position cho display nhỏ hơn
-            float scaleX = (float)(GameState.GameWidth - 2) / GameState.GameWidth;
-            float scaleY = (float)GAME_DISPLAY_HEIGHT / GameState.GameHeight;
-
-            int scaledPipeX = (int)(pipe.X * scaleX);
-            int scaledTopHeight = (int)(pipe.TopHeight * scaleY);
-            int scaledBottomHeight = (int)(pipe.BottomHeight * scaleY);
-
-            // Vẽ pipe trên
-            for (int y = 0; y <= scaledTopHeight && y < GAME_DISPLAY_HEIGHT; y++)
+            // 3. Chim – cùng char và cánh như SinglePlayerRenderer
+            int bx = GameState.BirdX - 1;
+            int by = ScaleY(gs.BirdY);
+            if ((uint)bx < GAME_CONTENT_W && (uint)by < GAME_DISPLAY_H)
             {
-                for (int dx = -1; dx <= 1; dx++)
+                buf[by, bx] = gs.BirdVelocity < -0.12f ? '^'
+                             : gs.BirdVelocity > 0.12f ? 'v'
+                             : BirdChar;
+                if (bx - 1 >= 0)
                 {
-                    int x = scaledPipeX + dx;
-                    if (x >= 0 && x < GameState.GameWidth - 2)
-                    {
-                        buffer[y, x] = '█';
-                    }
+                    gs.BirdAnimationFrame = (gs.BirdAnimationFrame + 1) % 4;
+                    buf[by, bx - 1] = gs.BirdAnimationFrame < 2 ? '~' : '_';
                 }
             }
+        }
 
-            // Vẽ pipe dưới
-            for (int y = GAME_DISPLAY_HEIGHT - scaledBottomHeight; y < GAME_DISPLAY_HEIGHT; y++)
+        private static void DrawPipeRow(char[,] buf, int y, int cx)
+        {
+            if (cx - 1 >= 0) buf[y, cx - 1] = PipeChar;
+            buf[y, cx] = PipeChar;
+            if (cx + 1 < GAME_CONTENT_W) buf[y, cx + 1] = PipeChar;
+        }
+
+        private static void DrawCapRow(char[,] buf, int y, int cx, char cap)
+        {
+            for (int dx = -2; dx <= 2; dx++)
             {
-                if (y >= 0)
-                {
-                    for (int dx = -1; dx <= 1; dx++)
-                    {
-                        int x = scaledPipeX + dx;
-                        if (x >= 0 && x < GameState.GameWidth - 2)
-                        {
-                            buffer[y, x] = '█';
-                        }
-                    }
-                }
+                int x = cx + dx;
+                if ((uint)x < GAME_CONTENT_W) buf[y, x] = cap;
             }
         }
 
-        /// <summary>
-        /// Vẽ bird vào buffer - logic từ GameRenderer với animation tương tự SinglePlayerGameMode
-        /// </summary>
-        private void DrawBirdIntoBuffer(char[,] buffer, GameState playerState)
+        private void FlushContent(char[,] buf, int bufY)
         {
-            // Scale bird position cho display nhỏ hơn
-            float scaleX = (float)(GameState.GameWidth - 2) / GameState.GameWidth;
-            float scaleY = (float)GAME_DISPLAY_HEIGHT / GameState.GameHeight;
-
-            int scaledBirdX = (int)(GameState.BirdX * scaleX);
-            int scaledBirdY = (int)(playerState.BirdY * scaleY);
-
-            if (scaledBirdX >= 0 && scaledBirdX < GameState.GameWidth - 2 &&
-                scaledBirdY >= 0 && scaledBirdY < GAME_DISPLAY_HEIGHT)
+            for (int y = 0; y < GAME_DISPLAY_H; y++)
             {
-                // Animation cho chim - dựa vào frame counter như SinglePlayerGameMode
-                char birdChar = GetBirdCharacter(playerState.FrameCounter, playerState.BirdVelocity);
-                buffer[scaledBirdY, scaledBirdX] = birdChar;
+                _buf.WriteToBuffer(0, bufY + y, '║', ConsoleColor.Cyan);
+                for (int x = 0; x < GAME_CONTENT_W; x++)
+                    _buf.WriteToBuffer(x + 1, bufY + y, buf[y, x], CharColor(buf[y, x]));
+                _buf.WriteToBuffer(BORDER_W - 1, bufY + y, '║', ConsoleColor.Cyan);
             }
         }
 
-        /// <summary>
-        /// Lấy ký tự bird với animation - tương tự SinglePlayerGameMode
-        /// </summary>
-        private char GetBirdCharacter(int frameCounter, float velocity)
+        private void OverlayDigit(string[] rows, int gameAreaY, ConsoleColor color)
         {
-            // Hiệu ứng "cánh chim" theo frame
-            bool wingUp = (frameCounter / 3) % 2 == 0;
+            int startY = gameAreaY + (GAME_DISPLAY_H - rows.Length) / 2;
+            int startX = BORDER_W / 2 - (rows[0].Length) / 2;
+            for (int r = 0; r < rows.Length; r++)
+                for (int c = 0; c < rows[r].Length; c++)
+                    if (rows[r][c] != ' ')
+                        _buf.WriteToBuffer(startX + c, startY + r, rows[r][c], color);
+        }
 
-            // Thay đổi hình dạng theo vận tốc (hướng bay)
-            if (velocity < -2) // Bay lên nhanh
-            {
-                return wingUp ? 'Ø' : 'ø';
-            }
-            else if (velocity > 2) // Rơi nhanh
-            {
-                return wingUp ? '◊' : '♦';
-            }
-            else // Bay bình thường
-            {
-                return wingUp ? 'o' : '°';
-            }
+        // ── HELPERS ──────────────────────────────────────────────────────────
+
+        /// <summary>Scale Y: game(0..21) → display(0..10), scale = 0.5</summary>
+        private static int ScaleY(int gy) =>
+            (int)(gy * GAME_DISPLAY_H / (float)GameState.GameHeight);
+
+        private static ConsoleColor CharColor(char ch) => ch switch
+        {
+            '█' => ConsoleColor.Green,
+            '▀' or '▄' => ConsoleColor.DarkGreen,
+            '♦' or '^' or 'v' => ConsoleColor.Yellow,
+            '~' or '_' => ConsoleColor.DarkYellow,
+            '·' => ConsoleColor.DarkGray,
+            _ => ConsoleColor.White
+        };
+
+        private static string BuildScoreLine(GameState p1, GameState p2)
+        {
+            string s1 = p1.GameOver ? $"P1: {p1.Score,3} (OUT)" : $"P1: {p1.Score,3}";
+            string s2 = p2.GameOver ? $"P2: {p2.Score,3} (OUT)" : $"P2: {p2.Score,3}";
+            return $" {s1}  │  {s2}";
+        }
+
+        private void WriteBorder(int y, char l, char m, char r, ConsoleColor c)
+        {
+            _buf.WriteToBuffer(0, y, l, c);
+            for (int x = 1; x < BORDER_W - 1; x++)
+                _buf.WriteToBuffer(x, y, m, c);
+            _buf.WriteToBuffer(BORDER_W - 1, y, r, c);
+        }
+
+        private void WriteInfo(int y, string text, ConsoleColor fg, ConsoleColor borderColor)
+        {
+            _buf.WriteToBuffer(0, y, '║', borderColor);
+            for (int i = 0; i < BORDER_W - 2; i++)
+                _buf.WriteToBuffer(i + 1, y, i < text.Length ? text[i] : ' ', fg);
+            _buf.WriteToBuffer(BORDER_W - 1, y, '║', borderColor);
         }
     }
 }

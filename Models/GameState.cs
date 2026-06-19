@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace FlappyBird.Models
 {
     /// <summary>
@@ -36,6 +34,13 @@ namespace FlappyBird.Models
         public const int BaseGapSize = 10; // Gap lớn hơn cho height 22
         public const int MinGapSize = 7;   // Gap tối thiểu vẫn chơi được
         
+        // === PHYSICS PRECISE POSITION ===
+        // BirdYf giữ vị trí float cho vật lý delta time; BirdY là int để render/collision
+        public float BirdYf { get; set; } = 11f;
+
+        // Bộ tích lũy thời gian di chuyển ống (giây), thay thế FrameCounter%PipeSpeed
+        public float PipeTimeAccumulator { get; set; } = 0f;
+
         // === ANIMATION & EFFECTS ===
         public int BirdAnimationFrame { get; set; } = 0;
         
@@ -66,8 +71,10 @@ namespace FlappyBird.Models
         /// </summary>
         public void Reset()
         {
-            BirdY = 11; // Vị trí giữa màn hình (22/2 = 11)
+            BirdY = 11;
+            BirdYf = 11f;
             BirdVelocity = 0f;
+            PipeTimeAccumulator = 0f;
             Score = 0;
             GameOver = false;
             GameStarted = false;

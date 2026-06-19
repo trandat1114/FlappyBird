@@ -1,150 +1,104 @@
-using System;
+using FlappyBird.Localization;
 using FlappyBird.Models;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Xử lý Game Over menu cho TwoPlayerGameMode
+    /// Game Over menu cho TwoPlayer – hiển thị tại footer (rows 30-35),
+    /// nhất quán với SinglePlayer game over layout và dùng TwoPlayerBuffer.
     /// </summary>
     public class TwoPlayerGameOverMenu(TwoPlayerBuffer buffer)
     {
-        private bool showGameOverMenu = false;
-        private int gameOverSelectedIndex = 0; // 0: Chơi lại, 1: Về menu chính
-        private readonly string[] gameOverOptions = ["Choi lai", "Ve menu chinh"];
-        private DateTime gameOverTime = DateTime.MinValue; // Thời gian bắt đầu game over
+        // ── LAYOUT ──────────────────────────────────────────────────────────
+        private const int BORDER_W = TwoPlayerBuffer.MENU_BORDER_WIDTH;      // 66
+        private const int TOTAL_H = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT;    // 36
+        private const int FOOTER_H = 6;
+        private const int FOOTER_Y = TOTAL_H - FOOTER_H;                     // 30
 
-        private readonly TwoPlayerBuffer buffer = buffer;
+        private readonly TwoPlayerBuffer _buf = buffer;
 
-        public bool ShowGameOverMenu => showGameOverMenu;
-        public DateTime GameOverTime => gameOverTime;
+        private bool _show = false;
+        private int _selectedIndex = 0;
+        private DateTime _startTime = DateTime.MinValue;
 
-        /// <summary>
-        /// Bắt đầu hiển thị game over menu
-        /// </summary>
+        private static string[] Options => [L.Get(L.GO_PLAY_AGAIN), L.Get(L.GO_MAIN_MENU)];
+
+        public bool ShowGameOverMenu => _show;
+        public DateTime GameOverTime => _startTime;
+
         public void StartGameOverMenu()
         {
-            showGameOverMenu = true;
-            gameOverSelectedIndex = 0; // Reset về "Chơi lại"
-            gameOverTime = DateTime.Now; // Ghi lại thời gian game over
+            _show = true;
+            _selectedIndex = 0;
+            _startTime = DateTime.Now;
         }
 
-        /// <summary>
-        /// Reset game over menu state
-        /// </summary>
         public void ResetGameOverMenu()
         {
-            showGameOverMenu = false;
-            gameOverSelectedIndex = 0;
-            gameOverTime = DateTime.MinValue;
+            _show = false;
+            _selectedIndex = 0;
+            _startTime = DateTime.MinValue;
         }
 
+        public bool CanReceiveInput() =>
+            _show && DateTime.Now - _startTime > TimeSpan.FromMilliseconds(800);
+
+        // ── RENDER ──────────────────────────────────────────────────────────
+
         /// <summary>
-        /// Render game over menu vào buffer
+        /// Viết game over panel vào buffer tại rows FOOTER_Y..FOOTER_Y+5.
+        /// Gọi sau khi renderer đã vẽ 2 game panel để không bị đè.
         /// </summary>
-        public void RenderGameOverMenuToBuffer(GameState player1State, GameState player2State)
+        public void RenderGameOverMenuToBuffer(GameState p1, GameState p2)
         {
-            // Clear area first
-            for (int y = 5; y < 20; y++)
-            {
-                for (int x = 10; x < 56; x++)
-                {
-                    buffer.WriteToBuffer(x, y, ' ', ConsoleColor.White);
-                }
-            }
+            string winner = GetWinner(p1, p2);
+            bool isTie = p1.GameOver && p2.GameOver && p1.Score == p2.Score;
+            ConsoleColor winColor = isTie ? ConsoleColor.Yellow : ConsoleColor.Green;
+            string pts = L.Get(L.GO_POINTS);
 
-            // Menu border
-            int menuStartX = 15;
-            int menuStartY = 8;
-            int menuWidth = 36;
-            int menuHeight = 8;
+            // Row 0: top border  ╔══...══╗  (Red)
+            WriteBorder(FOOTER_Y, '╔', '═', '╗', ConsoleColor.Red);
 
-            // Draw border
-            buffer.WriteToBuffer(menuStartX, menuStartY, '╔', ConsoleColor.White);
-            for (int i = 1; i < menuWidth - 1; i++)
-            {
-                buffer.WriteToBuffer(menuStartX + i, menuStartY, '═', ConsoleColor.White);
-            }
-            buffer.WriteToBuffer(menuStartX + menuWidth - 1, menuStartY, '╗', ConsoleColor.White);
+            // Row 1: winner + scores
+            string info = isTie
+                ? $"  {L.Get(L.TP_TIE_EXCLAIM)}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}"
+                : $"  {L.Get(L.TP_WINNER)}: {winner}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}";
+            WriteRow(FOOTER_Y + 1, info, winColor, ConsoleColor.Red);
 
-            // Menu content
-            string[] menuLines = [
-                "",
-                "           GAME OVER",
-                "",
-                $"    Player 1 Score: {player1State.Score}",
-                $"    Player 2 Score: {player2State.Score}",
-                "",
-                "    Choi lai",
-                "    Ve menu chinh"
-            ];
+            // Row 2: separator  ╠══...══╣  (Cyan)
+            WriteBorder(FOOTER_Y + 2, '╠', '═', '╣', ConsoleColor.Cyan);
 
-            for (int line = 0; line < menuLines.Length && line < menuHeight - 2; line++)
-            {
-                buffer.WriteToBuffer(menuStartX, menuStartY + 1 + line, '║', ConsoleColor.White);
+            // Row 3: menu options
+            string opt0 = _selectedIndex == 0 ? $"> {Options[0],-30}" : $"  {Options[0],-30}";
+            string opt1 = _selectedIndex == 1 ? $"> {Options[1],-28}" : $"  {Options[1],-28}";
+            string opts = $"  {opt0}  │  {opt1}";
+            WriteRowWithSelection(FOOTER_Y + 3, opts, _selectedIndex, ConsoleColor.Cyan);
 
-                string text = menuLines[line];
-                if (line == 6 || line == 7) // Menu options
-                {
-                    bool isSelected = (line == 6 && gameOverSelectedIndex == 0) ||
-                                     (line == 7 && gameOverSelectedIndex == 1);
+            // Row 4: controls hint
+            WriteRow(FOOTER_Y + 4, $"  {L.Get(L.TP_GO_CONTROLS)}", ConsoleColor.Gray, ConsoleColor.Cyan);
 
-                    // For simplicity in buffer, use different characters for selection
-                    if (isSelected)
-                    {
-                        text = ">>> " + text.Trim() + " <<<";
-                    }
-                }
-
-                for (int i = 0; i < text.Length && i < menuWidth - 2; i++)
-                {
-                    buffer.WriteToBuffer(menuStartX + 1 + i, menuStartY + 1 + line, text[i], ConsoleColor.White);
-                }
-
-                buffer.WriteToBuffer(menuStartX + menuWidth - 1, menuStartY + 1 + line, '║', ConsoleColor.White);
-            }
-
-            // Bottom border
-            buffer.WriteToBuffer(menuStartX, menuStartY + menuHeight - 1, '╚', ConsoleColor.White);
-            for (int i = 1; i < menuWidth - 1; i++)
-            {
-                buffer.WriteToBuffer(menuStartX + i, menuStartY + menuHeight - 1, '═', ConsoleColor.White);
-            }
-            buffer.WriteToBuffer(menuStartX + menuWidth - 1, menuStartY + menuHeight - 1, '╝', ConsoleColor.White);
+            // Row 5: bottom border  ╚══...══╝  (Cyan)
+            WriteBorder(FOOTER_Y + 5, '╚', '═', '╝', ConsoleColor.Cyan);
         }
 
-        /// <summary>
-        /// Xử lý input cho game over menu - tương tự SinglePlayerGameMode
-        /// </summary>
+        // ── INPUT ────────────────────────────────────────────────────────────
+
         public GameOverMenuAction HandleGameOverMenuInput(ConsoleKeyInfo keyInfo)
         {
             switch (keyInfo.Key)
             {
                 case ConsoleKey.UpArrow:
-                    gameOverSelectedIndex = gameOverSelectedIndex > 0 ? gameOverSelectedIndex - 1 : gameOverOptions.Length - 1;
-                    return GameOverMenuAction.None;
-
                 case ConsoleKey.DownArrow:
-                    gameOverSelectedIndex = gameOverSelectedIndex < gameOverOptions.Length - 1 ? gameOverSelectedIndex + 1 : 0;
+                    _selectedIndex = _selectedIndex == 0 ? 1 : 0;
                     return GameOverMenuAction.None;
 
                 case ConsoleKey.Enter:
-                    if (gameOverSelectedIndex == 0)
-                    {
-                        // Chọn "Chơi lại"
-                        return GameOverMenuAction.Restart;
-                    }
-                    else
-                    {
-                        // Chọn "Thoát"
-                        return GameOverMenuAction.Exit;
-                    }
+                    return _selectedIndex == 0 ? GameOverMenuAction.Restart : GameOverMenuAction.Exit;
 
                 case ConsoleKey.Spacebar:
-                    // Shortcut để restart nhanh
                     return GameOverMenuAction.Restart;
 
                 case ConsoleKey.Escape:
-                    // Thoát
                     return GameOverMenuAction.Exit;
 
                 default:
@@ -152,36 +106,54 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             }
         }
 
-        /// <summary>
-        /// Xác định người thắng
-        /// </summary>
-        public string GetWinner(GameState player1State, GameState player2State)
-        {
-            if (player1State.GameOver && player2State.GameOver)
-            {
-                if (player1State.Score > player2State.Score)
-                    return "PLAYER 1";
-                else if (player2State.Score > player1State.Score)
-                    return "PLAYER 2";
-                else
-                    return "HOA";
-            }
-            else if (player1State.GameOver)
-                return "PLAYER 2";
-            else if (player2State.GameOver)
-                return "PLAYER 1";
+        // ── HELPERS ──────────────────────────────────────────────────────────
 
-            return "DANG CHOI";
+        public string GetWinner(GameState p1, GameState p2)
+        {
+            if (p1.GameOver && p2.GameOver)
+            {
+                if (p1.Score > p2.Score) return "PLAYER 1";
+                if (p2.Score > p1.Score) return "PLAYER 2";
+                return L.Get(L.TP_TIE);
+            }
+            if (p1.GameOver) return "PLAYER 2";
+            if (p2.GameOver) return "PLAYER 1";
+            return L.Get(L.TP_PLAYING);
+        }
+
+        private void WriteBorder(int y, char l, char m, char r, ConsoleColor c)
+        {
+            _buf.WriteToBuffer(0, y, l, c);
+            for (int x = 1; x < BORDER_W - 1; x++)
+                _buf.WriteToBuffer(x, y, m, c);
+            _buf.WriteToBuffer(BORDER_W - 1, y, r, c);
+        }
+
+        private void WriteRow(int y, string text, ConsoleColor fg, ConsoleColor borderColor)
+        {
+            _buf.WriteToBuffer(0, y, '║', borderColor);
+            for (int i = 0; i < BORDER_W - 2; i++)
+                _buf.WriteToBuffer(i + 1, y, i < text.Length ? text[i] : ' ', fg);
+            _buf.WriteToBuffer(BORDER_W - 1, y, '║', borderColor);
+        }
+
+        private void WriteRowWithSelection(int y, string text, int sel, ConsoleColor borderColor)
+        {
+            _buf.WriteToBuffer(0, y, '║', borderColor);
+            // Option 0 occupies roughly left half, option 1 right half
+            // Just render text but highlight the selected option's ">" marker in Yellow
+            for (int i = 0; i < BORDER_W - 2; i++)
+            {
+                char ch = i < text.Length ? text[i] : ' ';
+                ConsoleColor fg = (i < (BORDER_W - 2) / 2 && sel == 0 && text.StartsWith("  >"))
+                                  || (i >= (BORDER_W - 2) / 2 && sel == 1)
+                    ? ConsoleColor.Yellow
+                    : ConsoleColor.White;
+                _buf.WriteToBuffer(i + 1, y, ch, fg);
+            }
+            _buf.WriteToBuffer(BORDER_W - 1, y, '║', borderColor);
         }
     }
 
-    /// <summary>
-    /// Enum cho các hành động của game over menu
-    /// </summary>
-    public enum GameOverMenuAction
-    {
-        None,
-        Restart,
-        Exit
-    }
+    public enum GameOverMenuAction { None, Restart, Exit }
 }

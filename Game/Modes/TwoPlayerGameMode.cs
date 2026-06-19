@@ -1,6 +1,4 @@
-using System;
 using FlappyBird.Models;
-using FlappyBird.Game;
 using FlappyBird.Game.Modes.TwoPlayer;
 
 namespace FlappyBird.Game.Modes
@@ -65,7 +63,7 @@ namespace FlappyBird.Game.Modes
         {
             if (GameState.GameWidth != MENU_BORDER_WIDTH)
             {
-                throw new InvalidOperationException($"Game width ({GameState.GameWidth}) không khớp với menu border width ({MENU_BORDER_WIDTH})");
+                throw new InvalidOperationException($"Game width ({GameState.GameWidth}) does not match menu border width ({MENU_BORDER_WIDTH})");
             }
         }
 
