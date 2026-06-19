@@ -1,10 +1,16 @@
 namespace FlappyBird.Models
 {
     /// <summary>
-    /// Class chứa tất cả trạng thái của game
+    /// All runtime game state. BirdState and DifficultyState are embedded here as
+    /// bridge properties (Phase 3 migration) — callers can start using them directly
+    /// and GameState flat properties will be removed once all modes are migrated.
     /// </summary>
     public class GameState
     {
+        // Phase 3 bridge: structured sub-objects available now; flat properties kept for compat
+        public BirdState       Bird       { get; } = new();
+        public DifficultyState Difficulty { get; } = new();
+
         // === GAME DIMENSIONS - PHÙ HỢP VỚI MENU DESIGN ===
         public const int GameWidth = 66;  // Khớp với menu border width
         public const int GameHeight = 22; // Tăng height để có không gian chơi tốt hơn
@@ -71,73 +77,46 @@ namespace FlappyBird.Models
         /// </summary>
         public void Reset()
         {
-            BirdY = 11;
-            BirdYf = 11f;
-            BirdVelocity = 0f;
+            Bird.Reset();
+            Difficulty.Reset();
+
+            // Sync flat properties from sub-objects for backward compat
+            BirdY = Bird.Y;
+            BirdYf = Bird.Yf;
+            BirdVelocity = Bird.Velocity;
+            BirdAnimationFrame = Bird.AnimationFrame;
+            DifficultyLevel = Difficulty.Level;
+            PipeSpeed = Difficulty.PipeSpeed;
+
             PipeTimeAccumulator = 0f;
             Score = 0;
             GameOver = false;
             GameStarted = false;
             FrameCounter = 0;
-            
-            // Reset difficulty về level 1
-            DifficultyLevel = 1;
-            PipeSpeed = 4; // Chậm nhất để bắt đầu
-            BirdAnimationFrame = 0;
-            
-            // Reset tracking variables cho rendering tối ưu
+
+            // Reset render tracking
             LastScore = 0;
             LastDifficultyLevel = 0;
             LastGameStarted = false;
             ForceFullRedraw = true;
-            
-            // Không reset GodMode, GodModeAutoRestart, GodModeAttempts, GodModeBestScore
-            // để giữ trạng thái qua các lần chơi
-            
-            // Clear pipes
+
             Pipes.Clear();
-            
-            // Reset màn hình buffer
+
             for (int y = 0; y < GameHeight; y++)
-            {
                 for (int x = 0; x < GameWidth; x++)
-                {
                     PreviousScreen[y, x] = ' ';
-                }
-            }
         }
         
-        /// <summary>
-        /// Cập nhật độ khó dựa trên điểm số
-        /// </summary>
         public void UpdateDifficulty()
         {
-            // Tăng level mỗi 5 điểm để có thời gian thích nghi
-            int newDifficultyLevel = (Score / 5) + 1;
-            
-            if (newDifficultyLevel != DifficultyLevel)
+            if (Difficulty.Update(Score))
             {
-                DifficultyLevel = newDifficultyLevel;
-                
-                // Pipe speed tăng dần
-                if (DifficultyLevel <= 2) PipeSpeed = 4;
-                else if (DifficultyLevel <= 4) PipeSpeed = 3;
-                else if (DifficultyLevel <= 6) PipeSpeed = 2;
-                else PipeSpeed = 1;
+                // Sync flat properties for callers still using them
+                DifficultyLevel = Difficulty.Level;
+                PipeSpeed       = Difficulty.PipeSpeed;
             }
         }
-        
-        /// <summary>
-        /// Tính gap size hiện tại dựa trên difficulty level
-        /// </summary>
-        public int GetCurrentGapSize()
-        {
-            // Level 1-3: Gap 9 (học cách chơi)
-            // Level 4-6: Gap 8 (trung bình) 
-            // Level 7-9: Gap 7 (khó)
-            // Level 10+: Gap 6 (chuyên nghiệp)
-            int currentGapSize = BaseGapSize - (DifficultyLevel / 3);
-            return System.Math.Max(MinGapSize, currentGapSize);
-        }
+
+        public int GetCurrentGapSize() => Difficulty.GapSize;
     }
 }

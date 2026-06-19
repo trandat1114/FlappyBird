@@ -1,99 +1,96 @@
 using FlappyBird.Localization;
 using FlappyBird.Models;
+using FlappyBird.Settings;
+using FlappyBird.UI;
 
 namespace FlappyBird.Game.Modes.SinglePlayer
 {
     public class SinglePlayerGameOverMenu(SinglePlayerRenderer renderer)
     {
-        // Layout phải khớp với SinglePlayerRenderer
         private const int GAME_AREA_TOP = 3;
-        private const int FOOTER_TOP = GAME_AREA_TOP + GameState.GameHeight; // = 25
+        private const int FOOTER_TOP    = GAME_AREA_TOP + GameState.GameHeight; // = 25
 
-        private bool showGameOverMenu = false;
-        private int gameOverSelectedIndex = 0;
+        private bool     _show              = false;
+        private int      _selectedIndex     = 0;
+        private DateTime _startTime         = DateTime.MinValue;
+
         private static string[] GameOverOptions => [L.Get(L.GO_PLAY_AGAIN), L.Get(L.GO_MAIN_MENU)];
-        private DateTime gameOverTime = DateTime.MinValue;
 
-        private readonly SinglePlayerRenderer renderer = renderer;
+        private readonly SinglePlayerRenderer _renderer = renderer;
 
-        public bool ShowGameOverMenu => showGameOverMenu;
-        public DateTime GameOverTime => gameOverTime;
+        public bool     ShowGameOverMenu => _show;
+        public DateTime GameOverTime     => _startTime;
 
         public void StartGameOverMenu()
         {
-            showGameOverMenu = true;
-            gameOverSelectedIndex = 0;
-            gameOverTime = DateTime.Now;
+            _show          = true;
+            _selectedIndex = 0;
+            _startTime     = DateTime.Now;
         }
 
         public void ResetGameOverMenu()
         {
-            showGameOverMenu = false;
-            gameOverSelectedIndex = 0;
-            gameOverTime = DateTime.MinValue;
+            _show          = false;
+            _selectedIndex = 0;
+            _startTime     = DateTime.MinValue;
         }
 
         public bool CanReceiveInput() =>
-            showGameOverMenu && DateTime.Now - gameOverTime > TimeSpan.FromMilliseconds(800);
+            _show && DateTime.Now - _startTime > TimeSpan.FromMilliseconds(800);
 
         public bool ShouldShowMenu() =>
-            showGameOverMenu && DateTime.Now - gameOverTime > TimeSpan.FromMilliseconds(800);
+            _show && DateTime.Now - _startTime > TimeSpan.FromMilliseconds(800);
 
         public void RenderGameOverMenu(GameState gs)
         {
-            renderer.Draw(gs);
+            _renderer.Draw(gs);
+
+            var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
+            panel.BorderColor = ConsoleColor.Red;
+
+            var opts = GameOverOptions;
 
             Console.SetCursorPosition(0, FOOTER_TOP);
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
-            Console.WriteLine("║                         GAME  OVER !                          ║");
-            Console.WriteLine("╠════════════════════════════════════════════════════════════════╣");
-            Console.WriteLine($"║                     Score: {gs.Score,3} {L.Get(L.GO_POINTS),-4}                       ║");
-            Console.WriteLine($"║                     Level: {gs.DifficultyLevel,3}                               ║");
-            Console.WriteLine("╠════════════════════════════════════════════════════════════════╣");
+            panel.PrintTop();
+            panel.PrintTitle(L.Get(L.GO_GAME_OVER), ConsoleColor.Red);
+            panel.PrintSep();
+            panel.PrintRow($"  Score: {gs.Score,3} {L.Get(L.GO_POINTS)}", ConsoleColor.Yellow);
+            panel.PrintRow($"  Level: {gs.DifficultyLevel}", ConsoleColor.Yellow);
+            panel.PrintSep();
 
-            for (int i = 0; i < GameOverOptions.Length; i++)
+            for (int i = 0; i < opts.Length; i++)
             {
-                if (i == gameOverSelectedIndex)
-                {
-                    Console.ForegroundColor = ConsoleColor.Black;
-                    Console.BackgroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"║  > {GameOverOptions[i],-58}  ║");
-                    Console.ResetColor();
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"║    {GameOverOptions[i],-58}  ║");
-                }
+                bool selected = i == _selectedIndex;
+                string prefix  = selected ? "  > " : "    ";
+                panel.PrintRow(
+                    $"{prefix}{opts[i]}",
+                    fg:        selected ? ConsoleColor.Black : ConsoleColor.White,
+                    contentBg: selected ? ConsoleColor.Yellow : null);
             }
 
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("╠════════════════════════════════════════════════════════════════╣");
-            Console.WriteLine(("║  " + L.Get(L.GO_CONTROLS)).PadRight(GameState.GameWidth - 1) + "║");
-            Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
-            Console.ResetColor();
+            panel.PrintSep();
+            panel.PrintRow($"  {L.Get(L.GO_CONTROLS)}", ConsoleColor.Gray);
+            panel.PrintBottom();
         }
 
         public SinglePlayerGameOverMenuInputResult HandleGameOverMenuInput(ConsoleKeyInfo keyInfo)
         {
             var result = new SinglePlayerGameOverMenuInputResult();
+            var opts   = GameOverOptions;
 
             switch (keyInfo.Key)
             {
                 case ConsoleKey.UpArrow:
-                    gameOverSelectedIndex = gameOverSelectedIndex > 0
-                        ? gameOverSelectedIndex - 1 : GameOverOptions.Length - 1;
+                    _selectedIndex = _selectedIndex > 0 ? _selectedIndex - 1 : opts.Length - 1;
                     break;
 
                 case ConsoleKey.DownArrow:
-                    gameOverSelectedIndex = gameOverSelectedIndex < GameOverOptions.Length - 1
-                        ? gameOverSelectedIndex + 1 : 0;
+                    _selectedIndex = _selectedIndex < opts.Length - 1 ? _selectedIndex + 1 : 0;
                     break;
 
                 case ConsoleKey.Enter:
-                    result.ShouldRestart = gameOverSelectedIndex == 0;
-                    result.ShouldExit = gameOverSelectedIndex != 0;
+                    result.ShouldRestart = _selectedIndex == 0;
+                    result.ShouldExit    = _selectedIndex != 0;
                     break;
 
                 case ConsoleKey.Spacebar:
@@ -112,6 +109,6 @@ namespace FlappyBird.Game.Modes.SinglePlayer
     public class SinglePlayerGameOverMenuInputResult
     {
         public bool ShouldRestart { get; set; } = false;
-        public bool ShouldExit { get; set; } = false;
+        public bool ShouldExit    { get; set; } = false;
     }
 }

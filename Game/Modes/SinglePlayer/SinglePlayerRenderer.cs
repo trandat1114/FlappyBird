@@ -1,5 +1,8 @@
 using FlappyBird.Localization;
 using FlappyBird.Models;
+using FlappyBird.Rendering;
+using FlappyBird.Settings;
+using FlappyBird.UI;
 
 namespace FlappyBird.Game.Modes.SinglePlayer
 {
@@ -154,79 +157,46 @@ namespace FlappyBird.Game.Modes.SinglePlayer
                 buf[by, bx - 1] = gs.BirdAnimationFrame < 2 ? '~' : '_';
         }
 
-        /// <summary>
-        /// Diff buffer và ghi chỉ những cell thay đổi theo từng run liên tiếp.
-        /// Không alloc List, không Sort – O(n) scan theo thứ tự tự nhiên y→x.
-        /// </summary>
         private static void FlushDiff(char[,] newBuf, GameState gs)
-        {
-            char[,] prev = gs.PreviousScreen;
-
-            for (int y = 0; y < GameState.GameHeight; y++)
-            {
-                int x = 0;
-                int consoleRow = y + GAME_AREA_TOP;
-
-                while (x < GameState.GameWidth)
-                {
-                    // Nhảy qua những cell không đổi
-                    if (newBuf[y, x] == prev[y, x]) { x++; continue; }
-
-                    // Bắt đầu run – đặt cursor một lần
-                    Console.SetCursorPosition(x, consoleRow);
-
-                    // Ghi liên tiếp cho đến khi gặp cell không đổi
-                    while (x < GameState.GameWidth && newBuf[y, x] != prev[y, x])
-                    {
-                        Console.Write(newBuf[y, x]);
-                        prev[y, x] = newBuf[y, x];
-                        x++;
-                    }
-                }
-            }
-        }
+            => DiffRenderer.Flush(newBuf, gs.PreviousScreen, originY: GAME_AREA_TOP);
 
         // ── HEADER / FOOTER ─────────────────────────────────────────────────
 
         private static void RenderHeader()
         {
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
-            Console.WriteLine("║                      FLAPPY  BIRD                              ║");
-            Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
-            Console.ResetColor();
+            var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
+            panel.PrintTop();
+            panel.PrintTitle("FLAPPY  BIRD");
+            panel.PrintBottom();
         }
 
         private static void RenderFooter(GameState gs)
         {
+            var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
+            ConsoleColor ctrlColor = gs.GameStarted ? ConsoleColor.Green : ConsoleColor.Yellow;
+
             Console.SetCursorPosition(0, FOOTER_TOP);
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
-            BuildStatusLine(gs);
-            Console.ForegroundColor = gs.GameStarted ? ConsoleColor.Green : ConsoleColor.Yellow;
-            string ctrlLine = gs.GameStarted
-                ? $"║ {L.Get(L.CTRL_MANUAL)}  │  {L.Get(L.CTRL_JUMP)}  │  {L.Get(L.CTRL_EXIT)}"
-                : $"║ {L.Get(L.CTRL_START)}  │  {L.Get(L.CTRL_EXIT)}";
-            Console.WriteLine(ctrlLine.PadRight(GameState.GameWidth - 1) + "║");
-            Console.ForegroundColor = ConsoleColor.White;
-            Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
-            Console.ResetColor();
+            panel.PrintTop();
+            BuildStatusLine(gs, panel);
+            string ctrlContent = gs.GameStarted
+                ? $" {L.Get(L.CTRL_MANUAL)}  │  {L.Get(L.CTRL_JUMP)}  │  {L.Get(L.CTRL_EXIT)}"
+                : $" {L.Get(L.CTRL_START)}  │  {L.Get(L.CTRL_EXIT)}";
+            panel.PrintRow(ctrlContent, ctrlColor);
+            panel.PrintBottom();
         }
 
         private static void UpdateFooterLine(GameState gs)
         {
             Console.SetCursorPosition(0, FOOTER_TOP + 1);
-            BuildStatusLine(gs);
+            BuildStatusLine(gs, GameSettings.Instance.CreatePanel(GameState.GameWidth));
         }
 
-        private static void BuildStatusLine(GameState gs)
+        private static void BuildStatusLine(GameState gs, UIPanel panel)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            string line = gs.GameStarted
-                ? $"║  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}          ║"
-                : $"║  {L.Get(L.STATUS_READY)}";
-            Console.WriteLine(line.PadRight(GameState.GameWidth));
-            Console.ResetColor();
+            string content = gs.GameStarted
+                ? $"  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}"
+                : $"  {L.Get(L.STATUS_READY)}";
+            panel.PrintRow(content, ConsoleColor.Yellow);
         }
 
         private static bool IsUiChanged(GameState gs) =>

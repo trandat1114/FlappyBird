@@ -1,8 +1,8 @@
-﻿using System;
-using FlappyBird.Audio;
+﻿using FlappyBird.Audio;
 using FlappyBird.Audio.Song;
 using FlappyBird.Enum;
 using FlappyBird.Game;
+using FlappyBird.Settings;
 using FlappyBird.UI;
 
 namespace FlappyBird;
@@ -27,7 +27,11 @@ class FlappyBirdGame
             }
         }
 
-        AudioManager.StartBackgroundMusic(HarryPotter.Melody);
+        // Load persisted settings before first render
+        SettingsSerializer.Load(GameSettings.Instance);
+
+        if (GameSettings.Instance.MusicEnabled)
+            AudioManager.StartBackgroundMusic(HarryPotter.Melody);
 
         // Main menu loop
         while (true)
@@ -54,6 +58,12 @@ class FlappyBirdGame
 
                 case MenuAction.AITournament:
                     GameEngine.StartGame(GameModeFactory.MenuActionToGameMode(menuAction));
+                    break;
+
+                case MenuAction.Settings:
+                    SettingsMenu.Show();
+                    GameSettings.Instance.Apply();
+                    SettingsSerializer.Save(GameSettings.Instance);
                     break;
 
                 case MenuAction.Exit:

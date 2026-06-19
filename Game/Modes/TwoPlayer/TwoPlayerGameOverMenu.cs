@@ -1,87 +1,87 @@
 using FlappyBird.Localization;
 using FlappyBird.Models;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Game Over menu cho TwoPlayer – hiển thị tại footer (rows 30-35),
-    /// nhất quán với SinglePlayer game over layout và dùng TwoPlayerBuffer.
+    /// Game Over panel for TwoPlayer — rendered at the footer (rows FOOTER_Y … FOOTER_Y+5)
+    /// via TwoPlayerBuffer diff-write (not Console.Write directly).
     /// </summary>
     public class TwoPlayerGameOverMenu(TwoPlayerBuffer buffer)
     {
-        // ── LAYOUT ──────────────────────────────────────────────────────────
-        private const int BORDER_W = TwoPlayerBuffer.MENU_BORDER_WIDTH;      // 66
-        private const int TOTAL_H = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT;    // 36
+        // ── Layout ──────────────────────────────────────────────────────────
+        private const int BORDER_W = TwoPlayerBuffer.MENU_BORDER_WIDTH;   // 66
+        private const int TOTAL_H  = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT; // 36
         private const int FOOTER_H = 6;
-        private const int FOOTER_Y = TOTAL_H - FOOTER_H;                     // 30
+        private const int FOOTER_Y = TOTAL_H - FOOTER_H;                  // 30
 
         private readonly TwoPlayerBuffer _buf = buffer;
 
-        private bool _show = false;
-        private int _selectedIndex = 0;
-        private DateTime _startTime = DateTime.MinValue;
+        private bool     _show          = false;
+        private int      _selectedIndex = 0;
+        private DateTime _startTime     = DateTime.MinValue;
 
         private static string[] Options => [L.Get(L.GO_PLAY_AGAIN), L.Get(L.GO_MAIN_MENU)];
 
-        public bool ShowGameOverMenu => _show;
-        public DateTime GameOverTime => _startTime;
+        public bool     ShowGameOverMenu => _show;
+        public DateTime GameOverTime     => _startTime;
+
+        // ── State ────────────────────────────────────────────────────────────
 
         public void StartGameOverMenu()
         {
-            _show = true;
+            _show          = true;
             _selectedIndex = 0;
-            _startTime = DateTime.Now;
+            _startTime     = DateTime.Now;
         }
 
         public void ResetGameOverMenu()
         {
-            _show = false;
+            _show          = false;
             _selectedIndex = 0;
-            _startTime = DateTime.MinValue;
+            _startTime     = DateTime.MinValue;
         }
 
         public bool CanReceiveInput() =>
             _show && DateTime.Now - _startTime > TimeSpan.FromMilliseconds(800);
 
-        // ── RENDER ──────────────────────────────────────────────────────────
+        // ── Render ───────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Viết game over panel vào buffer tại rows FOOTER_Y..FOOTER_Y+5.
-        /// Gọi sau khi renderer đã vẽ 2 game panel để không bị đè.
-        /// </summary>
         public void RenderGameOverMenuToBuffer(GameState p1, GameState p2)
         {
-            string winner = GetWinner(p1, p2);
-            bool isTie = p1.GameOver && p2.GameOver && p1.Score == p2.Score;
-            ConsoleColor winColor = isTie ? ConsoleColor.Yellow : ConsoleColor.Green;
-            string pts = L.Get(L.GO_POINTS);
+            bool   isTie    = p1.GameOver && p2.GameOver && p1.Score == p2.Score;
+            string winner   = GetWinner(p1, p2);
+            string pts      = L.Get(L.GO_POINTS);
+            var    bs       = GameSettings.Instance.GetBorderSet();
+            var    winColor = isTie ? ConsoleColor.Yellow : ConsoleColor.Green;
 
-            // Row 0: top border  ╔══...══╗  (Red)
-            WriteBorder(FOOTER_Y, '╔', '═', '╗', ConsoleColor.Red);
+            // Row 0: top border ╔══╗ (Red)
+            WriteBorder(FOOTER_Y, bs.TopLeft, bs.Horiz, bs.TopRight, ConsoleColor.Red);
 
-            // Row 1: winner + scores
-            string info = isTie
+            // Row 1: winner / tie headline
+            string headline = isTie
                 ? $"  {L.Get(L.TP_TIE_EXCLAIM)}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}"
                 : $"  {L.Get(L.TP_WINNER)}: {winner}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}";
-            WriteRow(FOOTER_Y + 1, info, winColor, ConsoleColor.Red);
+            WriteRow(FOOTER_Y + 1, headline, winColor, ConsoleColor.Red);
 
-            // Row 2: separator  ╠══...══╣  (Cyan)
-            WriteBorder(FOOTER_Y + 2, '╠', '═', '╣', ConsoleColor.Cyan);
+            // Row 2: separator ╠══╣ (Cyan)
+            WriteBorder(FOOTER_Y + 2, bs.TeeRight, bs.Horiz, bs.TeeLeft, ConsoleColor.Cyan);
 
             // Row 3: menu options
-            string opt0 = _selectedIndex == 0 ? $"> {Options[0],-30}" : $"  {Options[0],-30}";
-            string opt1 = _selectedIndex == 1 ? $"> {Options[1],-28}" : $"  {Options[1],-28}";
-            string opts = $"  {opt0}  │  {opt1}";
-            WriteRowWithSelection(FOOTER_Y + 3, opts, _selectedIndex, ConsoleColor.Cyan);
+            var opts = Options;
+            string opt0 = _selectedIndex == 0 ? $"> {opts[0],-30}" : $"  {opts[0],-30}";
+            string opt1 = _selectedIndex == 1 ? $"> {opts[1],-28}" : $"  {opts[1],-28}";
+            WriteRowWithSelection(FOOTER_Y + 3, $"  {opt0}  │  {opt1}", _selectedIndex, ConsoleColor.Cyan);
 
             // Row 4: controls hint
             WriteRow(FOOTER_Y + 4, $"  {L.Get(L.TP_GO_CONTROLS)}", ConsoleColor.Gray, ConsoleColor.Cyan);
 
-            // Row 5: bottom border  ╚══...══╝  (Cyan)
-            WriteBorder(FOOTER_Y + 5, '╚', '═', '╝', ConsoleColor.Cyan);
+            // Row 5: bottom border ╚══╝ (Cyan)
+            WriteBorder(FOOTER_Y + 5, bs.BotLeft, bs.Horiz, bs.BotRight, ConsoleColor.Cyan);
         }
 
-        // ── INPUT ────────────────────────────────────────────────────────────
+        // ── Input ────────────────────────────────────────────────────────────
 
         public GameOverMenuAction HandleGameOverMenuInput(ConsoleKeyInfo keyInfo)
         {
@@ -106,7 +106,7 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             }
         }
 
-        // ── HELPERS ──────────────────────────────────────────────────────────
+        // ── Helpers ──────────────────────────────────────────────────────────
 
         public string GetWinner(GameState p1, GameState p2)
         {
@@ -131,27 +131,30 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private void WriteRow(int y, string text, ConsoleColor fg, ConsoleColor borderColor)
         {
-            _buf.WriteToBuffer(0, y, '║', borderColor);
+            var bs = GameSettings.Instance.GetBorderSet();
+            _buf.WriteToBuffer(0, y, bs.Vert, borderColor);
             for (int i = 0; i < BORDER_W - 2; i++)
                 _buf.WriteToBuffer(i + 1, y, i < text.Length ? text[i] : ' ', fg);
-            _buf.WriteToBuffer(BORDER_W - 1, y, '║', borderColor);
+            _buf.WriteToBuffer(BORDER_W - 1, y, bs.Vert, borderColor);
         }
 
         private void WriteRowWithSelection(int y, string text, int sel, ConsoleColor borderColor)
         {
-            _buf.WriteToBuffer(0, y, '║', borderColor);
-            // Option 0 occupies roughly left half, option 1 right half
-            // Just render text but highlight the selected option's ">" marker in Yellow
+            var bs = GameSettings.Instance.GetBorderSet();
+            _buf.WriteToBuffer(0, y, bs.Vert, borderColor);
+            int half = (BORDER_W - 2) / 2;
             for (int i = 0; i < BORDER_W - 2; i++)
             {
                 char ch = i < text.Length ? text[i] : ' ';
-                ConsoleColor fg = (i < (BORDER_W - 2) / 2 && sel == 0 && text.StartsWith("  >"))
-                                  || (i >= (BORDER_W - 2) / 2 && sel == 1)
-                    ? ConsoleColor.Yellow
-                    : ConsoleColor.White;
+                bool isLeft  = i < half;
+                ConsoleColor fg =
+                    (isLeft  && sel == 0 && text.StartsWith("  >")) ||
+                    (!isLeft && sel == 1)
+                        ? ConsoleColor.Yellow
+                        : ConsoleColor.White;
                 _buf.WriteToBuffer(i + 1, y, ch, fg);
             }
-            _buf.WriteToBuffer(BORDER_W - 1, y, '║', borderColor);
+            _buf.WriteToBuffer(BORDER_W - 1, y, bs.Vert, borderColor);
         }
     }
 

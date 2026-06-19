@@ -1,6 +1,7 @@
 using FlappyBird.AI;
 using FlappyBird.Localization;
 using FlappyBird.Models;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Game.Modes
 {
@@ -11,13 +12,13 @@ namespace FlappyBird.Game.Modes
         private bool gameStarted = false;
 
         private bool _renderInitialized = false;
-        private int _lastScore1 = -1, _lastScore2 = -1;
-        private bool _lastOver1, _lastOver2;
+        private int  _lastScore1 = -1, _lastScore2 = -1;
+        private bool _lastOver1,       _lastOver2;
 
         public override void Initialize()
         {
             ai1State.Reset(); ai2State.Reset();
-            ai1State.GodMode = true; ai2State.GodMode = true;
+            ai1State.GodMode = ai2State.GodMode = true;
             ai1State.Pipes.Add(new Pipe(GameState.GameWidth - 1, GameState.BaseGapSize, GameState.GameHeight, Random));
             ai2State.Pipes.Add(new Pipe(GameState.GameWidth - 1, GameState.BaseGapSize, GameState.GameHeight, Random));
             gameStarted = false;
@@ -53,14 +54,14 @@ namespace FlappyBird.Game.Modes
         public override void Render()
         {
             bool changed =
-                ai1State.Score != _lastScore1 || ai2State.Score != _lastScore2 ||
-                ai1State.GameOver != _lastOver1 || ai2State.GameOver != _lastOver2;
+                ai1State.Score    != _lastScore1 || ai2State.Score    != _lastScore2 ||
+                ai1State.GameOver != _lastOver1  || ai2State.GameOver != _lastOver2;
 
             if (!_renderInitialized)
             {
                 Console.Clear();
                 Console.CursorVisible = false;
-                DrawStaticFrame();
+                DrawStatic();
                 _renderInitialized = true;
                 changed = true;
             }
@@ -68,45 +69,38 @@ namespace FlappyBird.Game.Modes
             if (changed)
             {
                 UpdateScoreLines();
-                _lastScore1 = ai1State.Score;
-                _lastScore2 = ai2State.Score;
-                _lastOver1 = ai1State.GameOver;
-                _lastOver2 = ai2State.GameOver;
+                _lastScore1 = ai1State.Score;  _lastScore2 = ai2State.Score;
+                _lastOver1  = ai1State.GameOver; _lastOver2  = ai2State.GameOver;
             }
         }
 
-        private void DrawStaticFrame()
+        private void DrawStatic()
         {
-            // Title – centered, always 66 chars
-            string title = L.Get(L.SPLIT_TITLE);
-            string centeredTitle = title.PadLeft((64 + title.Length) / 2).PadRight(64);
-
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
-            Console.WriteLine($"║{centeredTitle}║");
-            Console.WriteLine("╠════════════════════════════════════════════════════════════════╣");
-            Console.WriteLine(BuildAIScoreLine(ai1State, L.Get(L.AI_CONSERVATIVE)));  // row 3
-            Console.WriteLine(BuildAIScoreLine(ai2State, L.Get(L.AI_AGGRESSIVE)));    // row 4
-            Console.WriteLine("╠════════════════════════════════════════════════════════════════╣");
-            Console.WriteLine("║                                                                ║"); // row 6
-            Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
+            var panel = GameSettings.Instance.CreatePanel(66);
+            panel.PrintTop();
+            panel.PrintTitle(L.Get(L.SPLIT_TITLE));
+            panel.PrintSep();
+            Console.WriteLine(ScoreLine(ai1State, L.Get(L.AI_CONSERVATIVE))); // row 3
+            Console.WriteLine(ScoreLine(ai2State, L.Get(L.AI_AGGRESSIVE)));   // row 4
+            panel.PrintSep();
+            Console.WriteLine(panel.BuildEmptyRow());                          // row 6
+            panel.PrintBottom();
             Console.WriteLine();
             Console.ForegroundColor = ConsoleColor.Gray;
-            Console.WriteLine(L.Get(L.SPLIT_START_HINT));  // row 9
+            Console.WriteLine(L.Get(L.SPLIT_START_HINT));                     // row 9
             Console.ResetColor();
         }
 
         private void UpdateScoreLines()
         {
-            string pts = L.Get(L.AI_SCORE_LINE);
-            string gameOver = L.Get(L.AI_STATUS_LOST);
+            var panel = GameSettings.Instance.CreatePanel(66);
 
             Console.SetCursorPosition(0, 3);
             Console.ForegroundColor = ConsoleColor.White;
-            Console.Write(BuildAIScoreLine(ai1State, L.Get(L.AI_CONSERVATIVE)));
+            Console.Write(ScoreLine(ai1State, L.Get(L.AI_CONSERVATIVE)));
 
             Console.SetCursorPosition(0, 4);
-            Console.Write(BuildAIScoreLine(ai2State, L.Get(L.AI_AGGRESSIVE)));
+            Console.Write(ScoreLine(ai2State, L.Get(L.AI_AGGRESSIVE)));
 
             Console.SetCursorPosition(0, 6);
             if (ai1State.GameOver && ai2State.GameOver)
@@ -114,7 +108,7 @@ namespace FlappyBird.Game.Modes
                 string winner = ai1State.Score > ai2State.Score ? L.Get(L.AI_CONSERVATIVE) :
                                 ai2State.Score > ai1State.Score ? L.Get(L.AI_AGGRESSIVE)   : L.Get(L.AI_TIE);
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.Write(("║  *** " + L.Get(L.AI_FINAL_WINNER) + ": " + winner + " ***").PadRight(65) + "║");
+                Console.Write(panel.BuildRow($"  *** {L.Get(L.AI_FINAL_WINNER)}: {winner} ***"));
                 Console.SetCursorPosition(0, 9);
                 Console.ForegroundColor = ConsoleColor.Gray;
                 Console.Write(L.Get(L.SPLIT_RESTART_HINT).PadRight(60));
@@ -122,24 +116,23 @@ namespace FlappyBird.Game.Modes
             else if (!gameStarted)
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.Write(("║  " + L.Get(L.AI_START_HINT)).PadRight(65) + "║");
+                Console.Write(panel.BuildRow($"  {L.Get(L.AI_START_HINT)}"));
             }
             else
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.Write(("║  " + L.Get(L.AI_RUNNING)).PadRight(65) + "║");
+                Console.Write(panel.BuildRow($"  {L.Get(L.AI_RUNNING)}"));
             }
 
             Console.ResetColor();
         }
 
-        // 66-char border line: ║ + 64 content + ║
-        private string BuildAIScoreLine(GameState st, string name)
+        private string ScoreLine(GameState st, string name)
         {
+            var    panel  = GameSettings.Instance.CreatePanel(66);
             string pts    = L.Get(L.AI_SCORE_LINE);
             string status = st.GameOver ? $"({L.Get(L.AI_STATUS_LOST)})" : "";
-            string content = $"  {name}: {st.Score,3} {pts} {status}";
-            return ("║" + content).PadRight(65) + "║";
+            return panel.BuildRow($"  {name}: {st.Score,3} {pts} {status}");
         }
 
         public override void HandleInput(ConsoleKeyInfo keyInfo)
@@ -148,11 +141,7 @@ namespace FlappyBird.Game.Modes
             {
                 case ConsoleKey.Spacebar:
                     if (!gameStarted)
-                    {
-                        gameStarted = true;
-                        ai1State.GameStarted = true;
-                        ai2State.GameStarted = true;
-                    }
+                        gameStarted = ai1State.GameStarted = ai2State.GameStarted = true;
                     break;
                 case ConsoleKey.R:
                     if (ai1State.GameOver && ai2State.GameOver)

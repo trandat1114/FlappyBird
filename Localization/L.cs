@@ -53,6 +53,7 @@ public static class L
     public const string CTRL_PLAY_AGAIN     = nameof(CTRL_PLAY_AGAIN);
 
     // Game Over
+    public const string GO_GAME_OVER        = nameof(GO_GAME_OVER);
     public const string GO_PLAY_AGAIN       = nameof(GO_PLAY_AGAIN);
     public const string GO_MAIN_MENU        = nameof(GO_MAIN_MENU);
     public const string GO_POINTS           = nameof(GO_POINTS);
@@ -89,6 +90,16 @@ public static class L
     public const string SPLIT_TITLE         = nameof(SPLIT_TITLE);
     public const string SPLIT_START_HINT    = nameof(SPLIT_START_HINT);
     public const string SPLIT_RESTART_HINT  = nameof(SPLIT_RESTART_HINT);
+
+    // Settings
+    public const string MENU_SETTINGS       = nameof(MENU_SETTINGS);
+    public const string DESC_SETTINGS       = nameof(DESC_SETTINGS);
+    public const string SETTINGS_TITLE      = nameof(SETTINGS_TITLE);
+    public const string SETTINGS_LANGUAGE   = nameof(SETTINGS_LANGUAGE);
+    public const string SETTINGS_MUSIC      = nameof(SETTINGS_MUSIC);
+    public const string SETTINGS_BORDER     = nameof(SETTINGS_BORDER);
+    public const string SETTINGS_HINT       = nameof(SETTINGS_HINT);
+    public const string SETTINGS_THEME      = nameof(SETTINGS_THEME);
 
     // ── DICTIONARIES ──────────────────────────────────────────────────────
     // Future: replace with public static void LoadFromJson(string langCode, string path)
@@ -127,6 +138,7 @@ public static class L
             [CTRL_EXIT]          = "ESC: Exit",
             [CTRL_PLAY_AGAIN]    = "Space: Play again",
 
+            [GO_GAME_OVER]       = "GAME  OVER !",
             [GO_PLAY_AGAIN]      = "Play Again",
             [GO_MAIN_MENU]       = "Main Menu",
             [GO_POINTS]          = "pts",
@@ -162,6 +174,16 @@ public static class L
             [SPLIT_TITLE]        = "SPLIT SCREEN AI  -  In Development",
             [SPLIT_START_HINT]   = "SPACE: Start  |  R: Restart  |  ESC: Menu",
             [SPLIT_RESTART_HINT] = "R: Restart  |  ESC: Menu",
+
+            [MENU_SETTINGS]      = "       Settings",
+            [DESC_SETTINGS]      = "Language, sound, border style and more",
+            [SETTINGS_TITLE]     = "SETTINGS",
+            [SETTINGS_LANGUAGE]  = "Language",
+            [SETTINGS_MUSIC]     = "Background Music",
+            [SETTINGS_BORDER]    = "Border Style",
+            // max 60 chars (64 inner - 4 leading spaces)
+            [SETTINGS_HINT]      = "↑↓: Select   Enter: Toggle   R: Reset   ESC: Back",
+            [SETTINGS_THEME]     = "Theme",
         },
         [Language.Vietnamese] = new()
         {
@@ -195,6 +217,7 @@ public static class L
             [CTRL_EXIT]          = "ESC: Thoát",
             [CTRL_PLAY_AGAIN]    = "Space: Chơi lại",
 
+            [GO_GAME_OVER]       = "GAME OVER !",
             [GO_PLAY_AGAIN]      = "Chơi lại",
             [GO_MAIN_MENU]       = "Về menu chính",
             [GO_POINTS]          = "điểm",
@@ -230,6 +253,15 @@ public static class L
             [SPLIT_TITLE]        = "SPLIT SCREEN AI  -  Đang phát triển",
             [SPLIT_START_HINT]   = "SPACE: Bắt đầu  |  R: Chơi lại  |  ESC: Menu",
             [SPLIT_RESTART_HINT] = "R: Chơi lại  |  ESC: Menu",
+
+            [MENU_SETTINGS]      = "       Cài đặt",
+            [DESC_SETTINGS]      = "Ngôn ngữ, âm thanh, kiểu viền và nhiều hơn nữa",
+            [SETTINGS_TITLE]     = "CÀI ĐẶT",
+            [SETTINGS_LANGUAGE]  = "Ngôn ngữ",
+            [SETTINGS_MUSIC]     = "Nhạc nền",
+            [SETTINGS_BORDER]    = "Kiểu viền",
+            [SETTINGS_HINT]      = "↑↓: Chọn   Enter: Đổi   R: Mặc định   ESC: Quay lại",
+            [SETTINGS_THEME]     = "Giao diện",
         }
     };
 }

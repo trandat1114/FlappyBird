@@ -8,6 +8,14 @@ namespace FlappyBird.Audio;
 
 public static class AudioManager
 {
+    /// <summary>
+    /// Active audio provider. Replace to swap implementation:
+    ///   AudioManager.Provider = NullAudioProvider.Instance;  // silence
+    ///   AudioManager.Provider = ConsoleBeepAudioProvider.Instance;  // default
+    /// SettingsMenu toggles music by calling StartBackgroundMusic / StopBackgroundMusic.
+    /// </summary>
+    public static IAudioProvider Provider { get; set; } = ConsoleBeepAudioProvider.Instance;
+
     private static CancellationTokenSource? _cancellationTokenSource;
     private static readonly ConcurrentBag<CancellationTokenSource> _soundEffectTokens = new();
     public static bool _isPlaying = false;
