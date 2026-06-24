@@ -13,8 +13,8 @@ namespace FlappyBird.Game.Modes.TwoPlayer
         // ── Layout ──────────────────────────────────────────────────────────
         private const int BORDER_W = TwoPlayerBuffer.MENU_BORDER_WIDTH;   // 66
         private const int TOTAL_H  = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT; // 36
-        private const int FOOTER_H = 6;
-        private const int FOOTER_Y = TOTAL_H - FOOTER_H;                  // 30
+        private const int FOOTER_H = 4;
+        private const int FOOTER_Y = TOTAL_H - FOOTER_H;                  // 20
 
         private readonly TwoPlayerBuffer _buf = buffer;
 
@@ -59,26 +59,21 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             // Row 0: top border ╔══╗ (Red)
             WriteBorder(FOOTER_Y, bs.TopLeft, bs.Horiz, bs.TopRight, ConsoleColor.Red);
 
-            // Row 1: winner / tie headline
+            // Row 1: winner / tie headline + scores
             string headline = isTie
                 ? $"  {L.Get(L.TP_TIE_EXCLAIM)}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}"
                 : $"  {L.Get(L.TP_WINNER)}: {winner}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}";
             WriteRow(FOOTER_Y + 1, headline, winColor, ConsoleColor.Red);
 
-            // Row 2: separator ╠══╣ (Cyan)
-            WriteBorder(FOOTER_Y + 2, bs.TeeRight, bs.Horiz, bs.TeeLeft, ConsoleColor.Cyan);
-
-            // Row 3: menu options
+            // Row 2: options + controls hint
             var opts = Options;
-            string opt0 = _selectedIndex == 0 ? $"> {opts[0],-30}" : $"  {opts[0],-30}";
-            string opt1 = _selectedIndex == 1 ? $"> {opts[1],-28}" : $"  {opts[1],-28}";
-            WriteRowWithSelection(FOOTER_Y + 3, $"  {opt0}  │  {opt1}", _selectedIndex, ConsoleColor.Cyan);
+            string opt0 = _selectedIndex == 0 ? $"> {opts[0],-20}" : $"  {opts[0],-20}";
+            string opt1 = _selectedIndex == 1 ? $"> {opts[1],-18}" : $"  {opts[1],-18}";
+            WriteRowWithSelection(FOOTER_Y + 2,
+                $"  {opt0}  │  {opt1}  │  {L.Get(L.TP_GO_CONTROLS)}", _selectedIndex, winColor);
 
-            // Row 4: controls hint
-            WriteRow(FOOTER_Y + 4, $"  {L.Get(L.TP_GO_CONTROLS)}", ConsoleColor.Gray, ConsoleColor.Cyan);
-
-            // Row 5: bottom border ╚══╝ (Cyan)
-            WriteBorder(FOOTER_Y + 5, bs.BotLeft, bs.Horiz, bs.BotRight, ConsoleColor.Cyan);
+            // Row 3: bottom border ╚══╝
+            WriteBorder(FOOTER_Y + 3, bs.BotLeft, bs.Horiz, bs.BotRight, winColor);
         }
 
         // ── Input ────────────────────────────────────────────────────────────

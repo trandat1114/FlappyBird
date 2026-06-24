@@ -10,7 +10,7 @@ namespace FlappyBird.Game.Modes.TwoPlayer
     public class TwoPlayerBuffer
     {
         public const int MENU_BORDER_WIDTH = 66;
-        public const int TOTAL_DISPLAY_HEIGHT = 36;
+        public const int TOTAL_DISPLAY_HEIGHT = 24;
 
         private char[,] _prev = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];
         private char[,] _cur = new char[TOTAL_DISPLAY_HEIGHT, MENU_BORDER_WIDTH];

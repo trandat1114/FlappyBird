@@ -1,5 +1,6 @@
 using FlappyBird.Localization;
 using FlappyBird.Models;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
@@ -14,10 +15,10 @@ namespace FlappyBird.Game.Modes.TwoPlayer
     {
         // ── LAYOUT ──────────────────────────────────────────────────────────
         private const int BORDER_W = 66;
-        private const int GAME_DISPLAY_H = 11;      // nén từ 22 game rows
+        private const int GAME_DISPLAY_H = 6;       // nén từ 17 game rows
         private const int GAME_CONTENT_W = BORDER_W - 2; // 64
-        private const int PANEL_H = 15;             // header(3) + game(11) + border(1)
-        private const int TOTAL_H = 36;             // 2*PANEL_H + footer(6)
+        private const int PANEL_H = 10;             // header(3) + game(6) + border(1)
+        private const int TOTAL_H = 24;             // 2*PANEL_H + footer(4)
 
         // ── CHARACTERS ──────────────────────────────────────────────────────
         private const char PipeChar = '█';
@@ -50,17 +51,13 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         public void RenderDualPlayerFooterToBuffer(GameState p1, GameState p2)
         {
-            int fy = TOTAL_H - 6;
+            int fy = TOTAL_H - 4;
             WriteBorder(fy, '╔', '═', '╗', ConsoleColor.Yellow);
             WriteInfo(fy + 1, BuildScoreLine(p1, p2), ConsoleColor.White, ConsoleColor.Yellow);
-            WriteBorder(fy + 2, '╠', '═', '╣', ConsoleColor.Cyan);
-            WriteInfo(fy + 3,
-                $" {L.Get(L.TP_JUMP_P1)}  │  {L.Get(L.TP_JUMP_P2)}  │  [ESC] {L.Get(L.CTRL_EXIT)[5..]}",
-                ConsoleColor.Gray, ConsoleColor.Cyan);
-            WriteInfo(fy + 4,
-                $" {L.Get(L.TP_START_RESTART)}",
-                ConsoleColor.Gray, ConsoleColor.Cyan);
-            WriteBorder(fy + 5, '╚', '═', '╝', ConsoleColor.Cyan);
+            WriteInfo(fy + 2,
+                $" {L.Get(L.TP_JUMP_P1)}  │  {L.Get(L.TP_JUMP_P2)}  │  {L.Get(L.TP_START_RESTART)}  │  [ESC]",
+                ConsoleColor.Gray, GameSettings.Instance.PrimaryColor);
+            WriteBorder(fy + 3, '╚', '═', '╝', GameSettings.Instance.PrimaryColor);
         }
 
         /// <summary>Flash "GAME OVER" tại ranh giới giữa 2 panel (trước khi menu hiện)</summary>
@@ -96,17 +93,17 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private void RenderPlayerPanel(GameState gs, string label, int panelY, char[,] gameBuf)
         {
-            WriteBorder(panelY, '╔', '═', '╗', ConsoleColor.Cyan);
+            WriteBorder(panelY, '╔', '═', '╗', GameSettings.Instance.PrimaryColor);
             string info = gs.GameOver
                 ? $" {label}  │  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  [{L.Get(L.TP_OUT)}]"
                 : $" {label}  │  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}";
-            WriteInfo(panelY + 1, info, ConsoleColor.White, ConsoleColor.Cyan);
-            WriteBorder(panelY + 2, '╠', '═', '╣', ConsoleColor.Cyan);
+            WriteInfo(panelY + 1, info, ConsoleColor.White, GameSettings.Instance.PrimaryColor);
+            WriteBorder(panelY + 2, '╠', '═', '╣', GameSettings.Instance.PrimaryColor);
 
             BuildGameContent(gameBuf, gs);
             FlushContent(gameBuf, panelY + 3);
 
-            WriteBorder(panelY + 3 + GAME_DISPLAY_H, '╚', '═', '╝', ConsoleColor.Cyan);
+            WriteBorder(panelY + 3 + GAME_DISPLAY_H, '╚', '═', '╝', GameSettings.Instance.PrimaryColor);
         }
 
         /// <summary>
@@ -177,10 +174,10 @@ namespace FlappyBird.Game.Modes.TwoPlayer
         {
             for (int y = 0; y < GAME_DISPLAY_H; y++)
             {
-                _buf.WriteToBuffer(0, bufY + y, '║', ConsoleColor.Cyan);
+                _buf.WriteToBuffer(0, bufY + y, '║', GameSettings.Instance.PrimaryColor);
                 for (int x = 0; x < GAME_CONTENT_W; x++)
                     _buf.WriteToBuffer(x + 1, bufY + y, buf[y, x], CharColor(buf[y, x]));
-                _buf.WriteToBuffer(BORDER_W - 1, bufY + y, '║', ConsoleColor.Cyan);
+                _buf.WriteToBuffer(BORDER_W - 1, bufY + y, '║', GameSettings.Instance.PrimaryColor);
             }
         }
 

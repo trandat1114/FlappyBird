@@ -76,7 +76,7 @@ public sealed class ConsoleBeepAudioProvider : IAudioProvider
                 {
                     SoundEffect.Jump     => [(Note.C5, 80)],
                     SoundEffect.Score    => [(Note.E5, 120), (Note.G5, 120)],
-                    SoundEffect.GameOver => [(Note.G4, 80), (Note.F4, 80), (Note.E4, 150)],
+                    SoundEffect.GotHit   => [(Note.G4, 80), (Note.F4, 80), (Note.E4, 150)],
                     _                    => [],
                 };
                 foreach (var (note, dur) in seq)

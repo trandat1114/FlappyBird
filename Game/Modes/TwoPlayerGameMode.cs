@@ -144,6 +144,9 @@ namespace FlappyBird.Game.Modes
             // Nếu đang hiển thị game over menu - tương tự SinglePlayerGameMode
             if (gameOverMenu.ShowGameOverMenu)
             {
+                // Luôn render panels để giữ game state hiển thị
+                renderer.RenderDualStackedScreensToBuffer(player1State, player2State);
+
                 // Cho phép người chơi nhìn thấy kết quả một chút trước khi hiển thị menu
                 if (DateTime.Now - gameOverMenu.GameOverTime > TimeSpan.FromMilliseconds(800))
                 {
@@ -151,8 +154,6 @@ namespace FlappyBird.Game.Modes
                 }
                 else
                 {
-                    // Hiển thị game state hiện tại với overlay "GAME OVER"
-                    renderer.RenderDualStackedScreensToBuffer(player1State, player2State);
                     renderer.RenderGameOverOverlayToBuffer();
                 }
             }

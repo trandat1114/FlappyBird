@@ -143,9 +143,9 @@ namespace FlappyBird.Game.Modes
             {
                 if (GameState.BirdX >= pipe.X - 1 && GameState.BirdX <= pipe.X + 1)
                 {
-                    if (gameState.BirdY <= pipe.TopHeight || gameState.BirdY >= GameState.GameHeight - pipe.BottomHeight - 1)
+                    if (gameState.BirdY <= pipe.TopHeight - 1 || gameState.BirdY >= GameState.GameHeight - pipe.BottomHeight)
                     {
-                        AudioManager.PlaySoundEffect(SoundEffect.GameOver);
+                        AudioManager.PlaySoundEffect(SoundEffect.GotHit);
                         gameState.GameOver = true;
                         return;
                     }
@@ -154,7 +154,7 @@ namespace FlappyBird.Game.Modes
 
             if (gameState.BirdY <= 0 || gameState.BirdY >= GameState.GameHeight - 1)
             {
-                AudioManager.PlaySoundEffect(SoundEffect.GameOver);
+                AudioManager.PlaySoundEffect(SoundEffect.GotHit);
                 gameState.GameOver = true;
             }
         }
@@ -174,14 +174,13 @@ namespace FlappyBird.Game.Modes
         /// </summary>
         private void RestartGame()
         {
-            gameOverMenu.ResetGameOverMenu();
+            // Reset state BEFORE clearing show flag so game loop never sees
+            // ShowGameOverMenu=false with old pipes still in the list.
             gameState.Reset();
-
-            // Khởi tạo lại game với border dimensions chính xác
             initializer.InitializeGameWithMenuConsistentBorders(gameState, Random);
-
-            // Force full redraw
+            Console.Clear(); // Immediate visual clear on input thread; RenderWithConsistentDesign re-clears on next frame
             gameState.ForceFullRedraw = true;
+            gameOverMenu.ResetGameOverMenu(); // clear show flag last
         }
     }
 }

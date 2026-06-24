@@ -13,11 +13,11 @@ namespace FlappyBird.Models
 
         // === GAME DIMENSIONS - PHÙ HỢP VỚI MENU DESIGN ===
         public const int GameWidth = 66;  // Khớp với menu border width
-        public const int GameHeight = 22; // Tăng height để có không gian chơi tốt hơn
+        public const int GameHeight = 20; // 20 game rows + 4 footer = 24 rows (no header)
         public const int BirdX = 8;       // Điều chỉnh vị trí chim phù hợp với width mới
-        
+
         // === GAME STATE ===
-        public int BirdY { get; set; } = 11; // Vị trí khởi đầu ở giữa màn hình (22/2 = 11)
+        public int BirdY { get; set; } = 10; // Vị trí khởi đầu ở giữa màn hình (20/2 = 10)
         public float BirdVelocity { get; set; } = 0f;
         public int Score { get; set; } = 0;
         public bool GameOver { get; set; } = false;
@@ -26,7 +26,7 @@ namespace FlappyBird.Models
         
         // === PHYSICS - CÂN BẰNG CHO KHUNG NHỎ 20x80 ===
         public const float Gravity = 0.06f; // Cân bằng: đủ nhanh để cảm thấy tự nhiên, đủ chậm để kiểm soát
-        public const float JumpStrength = -0.8f; // Giảm xuống: vừa đủ để vượt gap mà không bay quá cao
+        public const float JumpStrength = -0.7f; // Nhẹ hơn: kiểm soát tốt hơn, phù hợp gap tối thiểu 5
         public const float MaxFallSpeed = 1.0f; // Cân bằng: nhanh nhưng vẫn kiểm soát được
         
         // === PIPES AND DIFFICULTY - TỐI ƯU CHO WIDTH MỚI ===
@@ -37,12 +37,12 @@ namespace FlappyBird.Models
         public int PipeSpeed { get; set; } = 4; // Chậm hơn ban đầu để học
         
         // === GAP SIZE ĐỘNG - TỐI ƯU CHO HEIGHT MỚI ===
-        public const int BaseGapSize = 10; // Gap lớn hơn cho height 22
-        public const int MinGapSize = 7;   // Gap tối thiểu vẫn chơi được
-        
+        public const int BaseGapSize = 7; // Gap phù hợp cho height 20
+        public const int MinGapSize = 5;  // Gap tối thiểu vẫn chơi được
+
         // === PHYSICS PRECISE POSITION ===
         // BirdYf giữ vị trí float cho vật lý delta time; BirdY là int để render/collision
-        public float BirdYf { get; set; } = 11f;
+        public float BirdYf { get; set; } = 10f;
 
         // Bộ tích lũy thời gian di chuyển ống (giây), thay thế FrameCounter%PipeSpeed
         public float PipeTimeAccumulator { get; set; } = 0f;

@@ -18,8 +18,8 @@ class FlappyBirdGame
         {
             try
             {
-                Console.SetWindowSize(100, 40);
-                Console.SetBufferSize(100, 40);
+                Console.SetWindowSize(80, 24);
+                Console.SetBufferSize(80, 24);
             }
             catch
             {

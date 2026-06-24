@@ -4,5 +4,5 @@ public enum SoundEffect
 {
     Jump,
     Score,
-    GameOver
+    GotHit,
 }

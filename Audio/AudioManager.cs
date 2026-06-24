@@ -28,20 +28,23 @@ public static class AudioManager
     // ── Audio file paths ───────────────────────────────────────────────────────
     private static string _flapPath  = "";
     private static string _pointPath = "";
+    private static string _hitPath   = "";
 
     /// <summary>
-    /// Sets the directory containing flap.mp3 and point.mp3, and pre-loads both
-    /// files into the NAudio engine for low-latency playback.
+    /// Sets the directory containing audio files, and pre-loads them into the
+    /// NAudio engine for low-latency playback.
     /// </summary>
     public static void SetAudioDir(string audioDir)
     {
         _flapPath  = Path.Combine(audioDir, "flap.mp3");
         _pointPath = Path.Combine(audioDir, "point.mp3");
+        _hitPath   = Path.Combine(audioDir, "got_hit.mp3");
 
         if (_engine is not null)
         {
             _engine.PreloadEffect(_flapPath);
             _engine.PreloadEffect(_pointPath);
+            _engine.PreloadEffect(_hitPath);
         }
     }
 
@@ -140,9 +143,14 @@ public static class AudioManager
                 }
                 break;
 
-            case SoundEffect.GameOver:
+            case SoundEffect.GotHit:
                 if (OperatingSystem.IsWindows())
-                    BeepAsync((Note.G4, 80), (Note.F4, 80), (Note.E4, 150));
+                {
+                    if (_engine is not null && _engine.HasEffect(_hitPath))
+                        _engine.PlayEffect(_hitPath, volF, startOffsetMs);
+                    else
+                        BeepAsync((Note.G4, 80), (Note.F4, 80), (Note.E4, 150));
+                }
                 break;
         }
     }

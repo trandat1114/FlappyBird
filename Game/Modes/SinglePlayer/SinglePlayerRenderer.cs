@@ -9,9 +9,9 @@ namespace FlappyBird.Game.Modes.SinglePlayer
     public class SinglePlayerRenderer
     {
         // === LAYOUT CONSTANTS ===
-        // Header chiếm 3 dòng (0-2); game bắt đầu từ dòng 3
-        private const int GAME_AREA_TOP = 3;
-        private const int FOOTER_TOP = GAME_AREA_TOP + GameState.GameHeight; // = 25
+        // No header; game area starts at row 0. Footer starts at row 20.
+        private const int GAME_AREA_TOP = 0;
+        private const int FOOTER_TOP = GAME_AREA_TOP + GameState.GameHeight; // = 20
 
         // === ASCII ART CHARACTERS ===
         private const char BirdChar = '♦';
@@ -70,7 +70,11 @@ namespace FlappyBird.Game.Modes.SinglePlayer
         public void RenderWithConsistentDesign(GameState gs)
         {
             Console.Clear();
-            RenderHeader();
+            // After Clear() the console is all spaces.
+            // Sync PreviousScreen so FlushDiff re-writes every visible cell.
+            for (int y = 0; y < GameState.GameHeight; y++)
+                for (int x = 0; x < GameState.GameWidth; x++)
+                    gs.PreviousScreen[y, x] = ' ';
             Draw(gs);
             RenderFooter(gs);
         }
@@ -158,17 +162,19 @@ namespace FlappyBird.Game.Modes.SinglePlayer
         }
 
         private static void FlushDiff(char[,] newBuf, GameState gs)
-            => DiffRenderer.Flush(newBuf, gs.PreviousScreen, originY: GAME_AREA_TOP);
+            => DiffRenderer.Flush(newBuf, gs.PreviousScreen, originY: GAME_AREA_TOP, colorFn: CharColor);
 
-        // ── HEADER / FOOTER ─────────────────────────────────────────────────
-
-        private static void RenderHeader()
+        private static ConsoleColor CharColor(char ch) => ch switch
         {
-            var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
-            panel.PrintTop();
-            panel.PrintTitle("FLAPPY  BIRD");
-            panel.PrintBottom();
-        }
+            '╔' or '╗' or '╚' or '╝' or '═' or '║' => GameSettings.Instance.PrimaryColor,
+            '█' or '▀' or '▄'                        => ConsoleColor.Green,
+            '♦' or '^'  or 'v'                        => ConsoleColor.Yellow,
+            '~' or '_'                                 => ConsoleColor.DarkYellow,
+            '·'                                        => ConsoleColor.DarkGray,
+            _                                          => ConsoleColor.DarkGray,
+        };
+
+        // ── FOOTER ──────────────────────────────────────────────────────────
 
         private static void RenderFooter(GameState gs)
         {
@@ -182,7 +188,10 @@ namespace FlappyBird.Game.Modes.SinglePlayer
                 ? $" {L.Get(L.CTRL_MANUAL)}  │  {L.Get(L.CTRL_JUMP)}  │  {L.Get(L.CTRL_EXIT)}"
                 : $" {L.Get(L.CTRL_START)}  │  {L.Get(L.CTRL_EXIT)}";
             panel.PrintRow(ctrlContent, ctrlColor);
-            panel.PrintBottom();
+            // Use Write (not WriteLine) on last row to prevent terminal scroll in 24-row buffer
+            Console.ForegroundColor = panel.BorderColor;
+            Console.Write(panel.BuildBottom());
+            Console.ResetColor();
         }
 
         private static void UpdateFooterLine(GameState gs)

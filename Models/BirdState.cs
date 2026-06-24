@@ -8,15 +8,15 @@ public class BirdState
 {
     public const int X = GameState.BirdX;
 
-    public int   Y             { get; set; } = 11;
-    public float Yf            { get; set; } = 11f;
+    public int   Y             { get; set; } = 10;
+    public float Yf            { get; set; } = 10f;
     public float Velocity      { get; set; } = 0f;
     public int   AnimationFrame { get; set; } = 0;
 
     public void Reset()
     {
-        Y              = 11;
-        Yf             = 11f;
+        Y              = 10;
+        Yf             = 10f;
         Velocity       = 0f;
         AnimationFrame = 0;
     }

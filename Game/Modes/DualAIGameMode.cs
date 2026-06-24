@@ -125,7 +125,7 @@ namespace FlappyBird.Game.Modes
         {
             // Row 3: round line
             Console.SetCursorPosition(0, 3);
-            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.ForegroundColor = GameSettings.Instance.PrimaryColor;
             Console.Write(RoundLine());
 
             // Rows 5-6: AI stat lines

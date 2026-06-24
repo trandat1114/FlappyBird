@@ -10,8 +10,8 @@ namespace FlappyBird.Game.Modes.SinglePlayer
     {
         // === MENU CONSISTENCY CONSTANTS ===
         private const int MENU_BORDER_WIDTH = 66;  // Khớp chính xác với menu border
-        private const int GAME_DISPLAY_HEIGHT = 22; // Chiều cao vùng game
-        private const int TOTAL_DISPLAY_HEIGHT = 30; // Tổng chiều cao (game + header + footer)
+        private const int GAME_DISPLAY_HEIGHT = 20; // Chiều cao vùng game (no header)
+        private const int TOTAL_DISPLAY_HEIGHT = 24; // Tổng chiều cao (game + header + footer)
 
         /// <summary>
         /// Validate rằng game dimensions khớp hoàn toàn với menu
