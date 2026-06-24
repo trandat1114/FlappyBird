@@ -3,7 +3,6 @@ using FlappyBird.Audio.Song;
 using FlappyBird.Localization;
 using FlappyBird.Settings;
 using FlappyBird.UI.Border;
-
 namespace FlappyBird.UI;
 
 /// <summary>
@@ -31,9 +30,12 @@ public static class SettingsMenu
         (ConsoleColor.DarkMagenta, "Dark Magenta"),
     ];
 
+    // ── Font sizes available ──────────────────────────────────────────────────
+    private static readonly int[] FontSizes = [10, 12, 14, 16, 18, 20, 22, 24, 28, 32];
+
     // ── Main screen ───────────────────────────────────────────────────────────
     private static int  _mainIdx;
-    private const  int  MAIN_COUNT = 3;
+    private const  int  MAIN_COUNT = 5;
 
     public static void Show()
     {
@@ -69,19 +71,17 @@ public static class SettingsMenu
         {
             case 0:
                 s.Language = s.Language == Language.English
-                    ? Language.Vietnamese
-                    : Language.English;
+                    ? Language.Vietnamese : Language.English;
                 s.Apply();
                 DrawMain();
                 break;
             case 1:
-                ShowAudio();
+                s.TargetFps = s.TargetFps == 60 ? 120 : 60;
                 DrawMain();
                 break;
-            case 2:
-                ShowTheme();
-                DrawMain();
-                break;
+            case 2: ShowAudio(); DrawMain(); break;
+            case 3: ShowTheme(); DrawMain(); break;
+            case 4: ShowFont();  DrawMain(); break;
         }
     }
 
@@ -102,12 +102,20 @@ public static class SettingsMenu
             : "English / [Tiếng Việt]";
         PrintMainRow(panel, 0, $"{L.Get(L.SETTINGS_LANGUAGE),-17}: {langVal}");
 
+        // FPS
+        string fpsVal = s.TargetFps == 120 ? "60 / [120]" : "[60] / 120";
+        PrintMainRow(panel, 1, $"{"FPS",-17}: {fpsVal}");
+
         // Audio summary
         string audioSummary = $"Music: {(s.MusicEnabled ? "On" : "Off")} {s.MusicVolume,3}% | FX: {s.EffectsVolume}%  ▶";
-        PrintMainRow(panel, 1, $"{"Audio",-17}  {audioSummary}");
+        PrintMainRow(panel, 2, $"{"Audio",-17}  {audioSummary}");
 
         // Theme summary
-        PrintMainRow(panel, 2, $"{"Theme",-17}  {s.CurrentThemeName}  ▶");
+        PrintMainRow(panel, 3, $"{"Theme",-17}  {s.CurrentThemeName}  ▶");
+
+        // Font summary
+        string fontLabel = string.IsNullOrEmpty(s.FontFaceName) ? "System Default" : s.FontFaceName;
+        PrintMainRow(panel, 4, $"{"Font",-17}  {fontLabel} {s.FontSize}px  ▶");
 
         panel.PrintSep();
         panel.PrintRow($"  {L.Get(L.SETTINGS_HINT)}", ConsoleColor.Gray);
@@ -124,7 +132,7 @@ public static class SettingsMenu
 
     // ── Audio sub-screen ──────────────────────────────────────────────────────
     private static int _audioIdx;
-    private const  int AUDIO_COUNT = 3;
+    private const  int AUDIO_COUNT = 4;
 
     private static void ShowAudio()
     {
@@ -147,7 +155,9 @@ public static class SettingsMenu
                     StepAudio(+1); DrawAudio(); break;
                 case ConsoleKey.Enter:
                 case ConsoleKey.Spacebar:
-                    StepAudio(+1); DrawAudio(); break;
+                    if (_audioIdx == 3) { AudioCalibrationMenu.Show(); DrawAudio(); }
+                    else { StepAudio(+1); DrawAudio(); }
+                    break;
                 case ConsoleKey.Escape:
                     return;
             }
@@ -171,7 +181,7 @@ public static class SettingsMenu
                 if (s.MusicEnabled)
                 {
                     if (s.MusicVolume == 0) AudioManager.StopBackgroundMusic();
-                    else if (!AudioManager._isPlaying)
+                    else if (!AudioManager.IsPlaying)
                         AudioManager.StartBackgroundMusic(HarryPotter.Melody);
                 }
                 break;
@@ -199,6 +209,11 @@ public static class SettingsMenu
         PrintAudioRow(panel, 0, $"Background Music  : {musicToggle}");
         PrintAudioRow(panel, 1, $"Music Volume      : {VolBar(s.MusicVolume)}");
         PrintAudioRow(panel, 2, $"Effects Volume    : {VolBar(s.EffectsVolume)}");
+
+        var off = AudioManager.AudioOffset;
+        string offsetSummary =
+            $"Jump {off.JumpStartOffsetMs}ms / Score {off.ScoreStartOffsetMs}ms  ▶";
+        PrintAudioRow(panel, 3, $"Calibrate Offset  : {offsetSummary}");
 
         panel.PrintSep();
         panel.PrintRow("  ↑↓: Select   ←→ / Enter: Adjust   ESC: Back", ConsoleColor.Gray);
@@ -355,4 +370,143 @@ public static class SettingsMenu
         Console.WriteLine(bs.Vert);                               // 1
         Console.ResetColor();
     }
+
+    // ── Font sub-screen ───────────────────────────────────────────────────────
+
+    private static int _fontIdx;
+
+    // Dynamic row count: 1 (System Default) + Available fonts + 1 (size row)
+    private static int FontRowCount => FontManager.Available.Length + 2;
+    private static int FontSizeRowIdx => FontManager.Available.Length + 1;
+
+    private static void ShowFont()
+    {
+        _fontIdx = FindActiveFontIdx();
+        DrawFont();
+
+        while (true)
+        {
+            switch (Console.ReadKey(true).Key)
+            {
+                case ConsoleKey.UpArrow:
+                    _fontIdx = (_fontIdx - 1 + FontRowCount) % FontRowCount;
+                    DrawFont(); break;
+                case ConsoleKey.DownArrow:
+                    _fontIdx = (_fontIdx + 1) % FontRowCount;
+                    DrawFont(); break;
+                case ConsoleKey.LeftArrow:
+                    if (_fontIdx == FontSizeRowIdx) { StepFontSize(-1); DrawFont(); }
+                    break;
+                case ConsoleKey.RightArrow:
+                    if (_fontIdx == FontSizeRowIdx) { StepFontSize(+1); DrawFont(); }
+                    else { ApplyFontByIdx(_fontIdx); DrawFont(); }
+                    break;
+                case ConsoleKey.Enter:
+                case ConsoleKey.Spacebar:
+                    if (_fontIdx == FontSizeRowIdx) StepFontSize(+1);
+                    else ApplyFontByIdx(_fontIdx);
+                    DrawFont(); break;
+                case ConsoleKey.R:
+                    var s = GameSettings.Instance;
+                    s.FontFaceName = "";
+                    s.FontSize     = 16;
+                    FontManager.RestoreDefault();
+                    _fontIdx = 0;
+                    DrawFont(); break;
+                case ConsoleKey.Escape:
+                    return;
+            }
+        }
+    }
+
+    private static int FindActiveFontIdx()
+    {
+        string cur = GameSettings.Instance.FontFaceName;
+        if (string.IsNullOrEmpty(cur)) return 0;
+        int i = Array.FindIndex(FontManager.Available, e => e.FaceName == cur);
+        return i >= 0 ? i + 1 : 0;
+    }
+
+    private static void ApplyFontByIdx(int idx)
+    {
+        var s = GameSettings.Instance;
+        if (idx == 0)
+        {
+            s.FontFaceName = "";
+            FontManager.RestoreDefault();
+        }
+        else
+        {
+            var entry = FontManager.Available[idx - 1];
+            if (FontManager.Apply(entry, s.FontSize))
+                s.FontFaceName = entry.FaceName;
+        }
+    }
+
+    private static void StepFontSize(int d)
+    {
+        var s = GameSettings.Instance;
+        int i = Array.IndexOf(FontSizes, s.FontSize);
+        i = Math.Clamp((i < 0 ? Array.IndexOf(FontSizes, 16) : i) + d, 0, FontSizes.Length - 1);
+        s.FontSize = FontSizes[i];
+
+        // Re-apply current font with new size immediately
+        if (!string.IsNullOrEmpty(s.FontFaceName))
+            FontManager.Apply(s.FontFaceName, s.FontSize);
+    }
+
+    private static void DrawFont()
+    {
+        Console.Clear();
+        var s     = GameSettings.Instance;
+        var panel = s.CreatePanel(66);
+
+        Console.SetCursorPosition(0, 0);
+        panel.PrintTop();
+        panel.PrintTitle("FONT");
+        panel.PrintSep();
+
+        if (FontManager.IsWindowsTerminal)
+            panel.PrintRow("  ⚠  Windows Terminal: use Settings > Appearance to change font.", ConsoleColor.Yellow);
+
+        // System Default row
+        bool sysActive = string.IsNullOrEmpty(s.FontFaceName);
+        PrintFontRow(panel, 0, "System Default", null, sysActive);
+
+        // Discovered font rows
+        for (int i = 0; i < FontManager.Available.Length; i++)
+        {
+            var e       = FontManager.Available[i];
+            bool active = s.FontFaceName == e.FaceName;
+            string disp = TruncPad(e.DisplayName, 22);
+            string face = TruncPad(e.FaceName,    24);
+            PrintFontRow(panel, i + 1, $"{disp} — {face}", null, active);
+        }
+
+        if (FontManager.Available.Length == 0)
+            panel.PrintRow("  No fonts found in Resources/Fonts/", ConsoleColor.DarkGray);
+
+        panel.PrintSep();
+
+        // Font size row
+        bool sizeSel = _fontIdx == FontSizeRowIdx;
+        string sizeContent = $"  {(sizeSel ? "► " : "  ")}Font Size  :  ◄ {s.FontSize}px ►";
+        panel.PrintRow(sizeContent, sizeSel ? ConsoleColor.Yellow : ConsoleColor.White);
+
+        panel.PrintSep();
+        panel.PrintRow("  ↑↓: Select   Enter: Apply   ←→: Adjust Size   R: Reset   ESC: Back", ConsoleColor.Gray);
+        panel.PrintBottom();
+    }
+
+    private static void PrintFontRow(UIPanel panel, int idx, string content, string? _, bool active)
+    {
+        bool   sel    = idx == _fontIdx;
+        string bullet = active ? "●" : "○";
+        string prefix = sel   ? "► " : "  ";
+        ConsoleColor fg = sel ? ConsoleColor.Yellow : ConsoleColor.White;
+        panel.PrintRow($"  {prefix}{bullet}  {content}", fg);
+    }
+
+    private static string TruncPad(string s, int max)
+        => s.Length <= max ? s : s[..(max - 1)] + "…";
 }

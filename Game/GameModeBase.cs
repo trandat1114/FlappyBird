@@ -1,3 +1,5 @@
+using FlappyBird.Audio;
+using FlappyBird.Audio.Enum;
 using FlappyBird.Models;
 
 namespace FlappyBird.Game
@@ -66,11 +68,16 @@ namespace FlappyBird.Game
                 {
                     gs.Pipes[i].X--;
 
-                    if (gs.Pipes[i].X < -2)
+                    // Score the instant the bird passes the pipe's right edge (X+1 < BirdX)
+                    if (!gs.Pipes[i].Scored && gs.Pipes[i].X + 1 < GameState.BirdX)
                     {
-                        gs.Pipes.RemoveAt(i);
+                        gs.Pipes[i].Scored = true;
                         gs.Score++;
+                        AudioManager.PlaySoundEffect(SoundEffect.Score);
                     }
+
+                    if (gs.Pipes[i].X < -2)
+                        gs.Pipes.RemoveAt(i);
                 }
 
                 // Spawn ống mới nếu cần

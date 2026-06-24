@@ -30,6 +30,8 @@ public static class SettingsSerializer
         public string BorderStyle   { get; set; } = "Double";
         public string PrimaryColor  { get; set; } = "Cyan";
         public string AccentColor   { get; set; } = "Yellow";
+        public string FontFaceName  { get; set; } = "";
+        public int    FontSize      { get; set; } = 16;
     }
 
     public static void Save(GameSettings s)
@@ -46,6 +48,8 @@ public static class SettingsSerializer
                 BorderStyle   = s.BorderStyle.ToString(),
                 PrimaryColor  = s.PrimaryColor.ToString(),
                 AccentColor   = s.AccentColor.ToString(),
+                FontFaceName  = s.FontFaceName,
+                FontSize      = s.FontSize,
             };
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, _opts));
         }
@@ -60,13 +64,15 @@ public static class SettingsSerializer
             var dto = JsonSerializer.Deserialize<Dto>(File.ReadAllText(FilePath), _opts);
             if (dto is null) return;
 
-            if (System.Enum.TryParse<Language>(dto.Language, out var lang))       s.Language     = lang;
-            if (System.Enum.TryParse<BorderStyle>(dto.BorderStyle, out var bs))  s.BorderStyle  = bs;
-            if (System.Enum.TryParse<ConsoleColor>(dto.PrimaryColor, out var pc)) s.PrimaryColor = pc;
-            if (System.Enum.TryParse<ConsoleColor>(dto.AccentColor,  out var ac)) s.AccentColor  = ac;
+            if (System.Enum.TryParse<Language>(dto.Language, out var lang))        s.Language     = lang;
+            if (System.Enum.TryParse<BorderStyle>(dto.BorderStyle, out var bs))    s.BorderStyle  = bs;
+            if (System.Enum.TryParse<ConsoleColor>(dto.PrimaryColor, out var pc))  s.PrimaryColor = pc;
+            if (System.Enum.TryParse<ConsoleColor>(dto.AccentColor,  out var ac))  s.AccentColor  = ac;
             s.MusicEnabled  = dto.MusicEnabled;
             s.MusicVolume   = Math.Clamp(dto.MusicVolume,   0, 100);
             s.EffectsVolume = Math.Clamp(dto.EffectsVolume, 0, 100);
+            s.FontFaceName  = dto.FontFaceName;
+            s.FontSize      = Math.Clamp(dto.FontSize, 8, 72);
             s.Apply();
         }
         catch { }

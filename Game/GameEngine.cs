@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using FlappyBird.Enum;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Game
 {
@@ -41,10 +42,15 @@ namespace FlappyBird.Game
         /// </summary>
         private static void GameLoop()
         {
-            var sw = Stopwatch.StartNew();
-            long lastTicks = sw.ElapsedTicks;
-            long targetTicks = Stopwatch.Frequency / 60; // ticks per frame tại 60fps
-            long spinThresholdTicks = Stopwatch.Frequency / 400; // ~2.5ms – chuyển sang spinwait
+            int  fps              = GameSettings.Instance.TargetFps;
+            var  sw               = Stopwatch.StartNew();
+            long lastTicks        = sw.ElapsedTicks;
+            long targetTicks      = Stopwatch.Frequency / fps;
+            // At 120fps the frame time (8.33ms) is shorter than Sleep(1) resolution (~15ms),
+            // so we skip sleeping entirely and always use SpinWait for precise timing.
+            long spinThresholdTicks = fps >= 120
+                ? targetTicks               // never sleep at 120fps
+                : Stopwatch.Frequency / 400; // ~2.5ms sleep threshold at 60fps
 
             while (isRunning && currentGameMode != null && !currentGameMode.IsGameOver())
             {

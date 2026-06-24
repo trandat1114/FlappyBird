@@ -1,237 +1,217 @@
-using System;
 using System.Collections.Concurrent;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Runtime.Versioning;
 using FlappyBird.Audio.Enum;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Audio;
 
+/// <summary>
+/// Central audio hub.
+///
+/// Background music : Console.Beep note loop (Windows only; the Harry Potter melody).
+/// Sound effects    : MP3 files via GameAudioEngine (NAudio).
+///                   Respects <see cref="AudioOffset"/> start-offset per sound.
+///                   Fallback to Console.Beep if files are not found.
+///
+/// Call <see cref="SetAudioDir"/> once at startup before any playback.
+/// Call <see cref="LoadAudioOffset"/> once at startup to restore saved calibration.
+/// </summary>
 public static class AudioManager
 {
-    /// <summary>
-    /// Active audio provider. Replace to swap implementation:
-    ///   AudioManager.Provider = NullAudioProvider.Instance;  // silence
-    ///   AudioManager.Provider = ConsoleBeepAudioProvider.Instance;  // default
-    /// SettingsMenu toggles music by calling StartBackgroundMusic / StopBackgroundMusic.
-    /// </summary>
+    // ── Phase-4 provider bridge (architectural hook, not yet wired for all paths) ──
     public static IAudioProvider Provider { get; set; } = ConsoleBeepAudioProvider.Instance;
 
-    private static CancellationTokenSource? _cancellationTokenSource;
-    private static readonly ConcurrentBag<CancellationTokenSource> _soundEffectTokens = new();
-    public static bool _isPlaying = false;
-    
-    // Thông số tối ưu cho âm thanh mượt mà
-    private const int NOTE_SEPARATION = 20; // Giảm khoảng cách giữa các nốt
-    private const int THREAD_PRIORITY_BOOST = 10; // Boost priority cho audio threads
-    
+    // ── NAudio engine (Windows only) ───────────────────────────────────────────
+    private static readonly GameAudioEngine? _engine =
+        OperatingSystem.IsWindows() ? new GameAudioEngine() : null;
+
+    // ── Audio file paths ───────────────────────────────────────────────────────
+    private static string _flapPath  = "";
+    private static string _pointPath = "";
+
+    /// <summary>
+    /// Sets the directory containing flap.mp3 and point.mp3, and pre-loads both
+    /// files into the NAudio engine for low-latency playback.
+    /// </summary>
+    public static void SetAudioDir(string audioDir)
+    {
+        _flapPath  = Path.Combine(audioDir, "flap.mp3");
+        _pointPath = Path.Combine(audioDir, "point.mp3");
+
+        if (_engine is not null)
+        {
+            _engine.PreloadEffect(_flapPath);
+            _engine.PreloadEffect(_pointPath);
+        }
+    }
+
+    // ── Per-sound start-offset calibration ────────────────────────────────────
+
+    /// <summary>
+    /// Live offset config. Written by the calibration menu; read by PlaySoundEffect.
+    /// Call <see cref="LoadAudioOffset"/> at startup to restore from disk.
+    /// </summary>
+    public static AudioOffsetConfig AudioOffset { get; private set; } = new();
+
+    /// <summary>Replaces <see cref="AudioOffset"/> with the value loaded from disk.</summary>
+    public static void LoadAudioOffset()
+        => AudioOffset = AudioOffsetSerializer.Load();
+
+    // ── Background music (Console.Beep note loop) ──────────────────────────────
+    private static CancellationTokenSource? _musicCts;
+    private static volatile bool _isMusicPlaying;
+
+    /// <summary>True while the Harry Potter background music loop is active.</summary>
+    public static bool IsPlaying => _isMusicPlaying;
+
+    private const int NOTE_SEP = 20;
+
     public static void StartBackgroundMusic((Note note, int duration)[] melody)
     {
-        if (_isPlaying) return;
+        if (_isMusicPlaying) return;
+        _musicCts       = new CancellationTokenSource();
+        _isMusicPlaying = true;
+        var token       = _musicCts.Token;
 
-        _cancellationTokenSource = new CancellationTokenSource();
-        _isPlaying = true;
-
-        // Tạo task với priority cao hơn cho âm thanh
-        var musicTask = Task.Factory.StartNew(
-            () => PlayBackgroundMusicLoop(melody, _cancellationTokenSource.Token),
-            _cancellationTokenSource.Token,
-            TaskCreationOptions.LongRunning,
-            TaskScheduler.Default
-        );
+        // Guard must be inside the lambda — the analyzer cannot track
+        // OperatingSystem.IsWindows() across lambda boundaries.
+        Task.Factory.StartNew(() =>
+        {
+            if (OperatingSystem.IsWindows()) MusicLoop(melody, token);
+        }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
     public static void StopBackgroundMusic()
     {
-        if (!_isPlaying) return;
-
-        _cancellationTokenSource?.Cancel();
-        
-        // Đợi một chút để task kết thúc gracefully
+        if (!_isMusicPlaying) return;
+        _musicCts?.Cancel();
         Thread.Sleep(50);
-        
-        _cancellationTokenSource?.Dispose();
-        _cancellationTokenSource = null;
-        _isPlaying = false;
+        _musicCts?.Dispose();
+        _musicCts       = null;
+        _isMusicPlaying = false;
+    }
+
+    // ── Sound effects ──────────────────────────────────────────────────────────
+    private static readonly ConcurrentBag<CancellationTokenSource> _fxTokens = [];
+
+    /// <summary>
+    /// Plays a sound effect using the current <see cref="GameSettings.EffectsVolume"/>
+    /// and the per-sound start offset from <see cref="AudioOffset"/>.
+    /// </summary>
+    public static void PlaySoundEffect(SoundEffect effect)
+    {
+        int vol = GameSettings.Instance.EffectsVolume;
+        if (vol <= 0) return;
+        PlaySoundEffectWithOffset(effect, AudioOffset.GetStartOffset(effect), vol / 100f);
+    }
+
+    /// <summary>
+    /// Plays a sound effect with an explicit start offset (used by calibration engine).
+    /// <paramref name="startOffsetMs"/>: skip this many ms from the start of the file.
+    /// Uses a guaranteed minimum volume of 50 % for the calibration UI.
+    /// </summary>
+    public static void PlaySoundEffectWithOffset(SoundEffect effect, int startOffsetMs)
+    {
+        float volF = Math.Max(GameSettings.Instance.EffectsVolume, 50) / 100f;
+        PlaySoundEffectWithOffset(effect, startOffsetMs, volF);
+    }
+
+    private static void PlaySoundEffectWithOffset(SoundEffect effect, int startOffsetMs, float volF)
+    {
+        switch (effect)
+        {
+            case SoundEffect.Jump:
+                if (OperatingSystem.IsWindows())
+                {
+                    if (_engine is not null && _engine.HasEffect(_flapPath))
+                        _engine.PlayEffect(_flapPath, volF, startOffsetMs);
+                    else
+                        BeepAsync((Note.C5, 80));
+                }
+                break;
+
+            case SoundEffect.Score:
+                if (OperatingSystem.IsWindows())
+                {
+                    if (_engine is not null && _engine.HasEffect(_pointPath))
+                        _engine.PlayEffect(_pointPath, volF, startOffsetMs);
+                    else
+                        BeepAsync((Note.E5, 120), (Note.G5, 120));
+                }
+                break;
+
+            case SoundEffect.GameOver:
+                if (OperatingSystem.IsWindows())
+                    BeepAsync((Note.G4, 80), (Note.F4, 80), (Note.E4, 150));
+                break;
+        }
     }
 
     public static void StopAllSounds()
     {
-        // Dừng nhạc nền trước
         StopBackgroundMusic();
-
-        // Dừng tất cả sound effects
-        var tokens = new List<CancellationTokenSource>();
-        while (_soundEffectTokens.TryTake(out var token))
-        {
-            tokens.Add(token);
-        }
-
-        // Cancel và dispose tất cả tokens
-        Parallel.ForEach(tokens, token =>
-        {
-            try
-            {
-                token.Cancel();
-                Thread.Sleep(10); // Cho phép task kết thúc
-                token.Dispose();
-            }
-            catch
-            {
-                // Ignore disposal errors
-            }
-        });
+        _engine?.Dispose();
+        while (_fxTokens.TryTake(out var cts))
+            try { cts.Cancel(); cts.Dispose(); } catch { }
     }
 
-    public static void PlaySoundEffect(SoundEffect effect)
+    // ── Console.Beep helpers (Windows-only) ────────────────────────────────────
+
+    [SupportedOSPlatform("windows")]
+    private static void BeepAsync(params (Note note, int duration)[] seq)
     {
-        if (!OperatingSystem.IsWindows()) return;
+        var cts   = new CancellationTokenSource();
+        _fxTokens.Add(cts);
+        var token = cts.Token;
 
-        var tokenSource = new CancellationTokenSource();
-        _soundEffectTokens.Add(tokenSource);
-
-        // Sử dụng Task.Factory với priority cao hơn
-        Task.Factory.StartNew(async () =>
+        Task.Factory.StartNew(() =>
         {
             try
             {
-                // Boost thread priority cho sound effects
                 Thread.CurrentThread.Priority = ThreadPriority.AboveNormal;
-
-                switch (effect)
+                foreach (var (note, dur) in seq)
                 {
-                    case SoundEffect.Jump:
-                        await PlaySoundSequence(tokenSource.Token, 
-                            (Note.C5, 80));
-                        break;
-
-                    case SoundEffect.Score:
-                        await PlaySoundSequence(tokenSource.Token,
-                            (Note.E5, 120),
-                            (Note.G5, 120));
-                        break;
-
-                    case SoundEffect.GameOver:
-                        await PlaySoundSequence(tokenSource.Token,
-                            (Note.G4, 80),
-                            (Note.F4, 80),
-                            (Note.E4, 150));
-                        break;
+                    if (token.IsCancellationRequested) break;
+                    Console.Beep((int)note, dur);
+                    if (seq.Length > 1) Thread.Sleep(30);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                // Task was cancelled - this is expected
-            }
-            catch
-            {
-                // Ignore other audio errors
-            }
-            finally
-            {
-                // Cleanup
-                try
-                {
-                    tokenSource.Dispose();
-                }
-                catch { }
-            }
-        }, tokenSource.Token, TaskCreationOptions.None, TaskScheduler.Default);
+            catch { }
+            finally { try { cts.Dispose(); } catch { } }
+        }, token, TaskCreationOptions.None, TaskScheduler.Default);
     }
 
-    // Helper method để phát sequence âm thanh mượt mà
-    private static async Task PlaySoundSequence(CancellationToken token, params (Note note, int duration)[] sequence)
+    [SupportedOSPlatform("windows")]
+    private static void MusicLoop((Note note, int duration)[] melody, CancellationToken token)
     {
-        foreach (var (note, duration) in sequence)
-        {
-            if (token.IsCancellationRequested) break;
-
-            try
-            {
-                if (OperatingSystem.IsWindows())
-                {
-                    Console.Beep((int)note, duration);
-                }
-                
-                // Khoảng nghỉ ngắn giữa các nốt cho mượt mà
-                if (sequence.Length > 1)
-                {
-                    await Task.Delay(30, token);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch
-            {
-                // Ignore beep errors
-            }
-        }
-    }
-
-    private static void PlayBackgroundMusicLoop((Note note, int duration)[] melody, CancellationToken cancellationToken)
-    {
-        if (!OperatingSystem.IsWindows()) return;
-
         try
         {
-            // Boost thread priority cho background music
             Thread.CurrentThread.Priority = ThreadPriority.Normal;
-
-            while (!cancellationToken.IsCancellationRequested)
+            while (!token.IsCancellationRequested)
             {
-                foreach (var (note, duration) in melody)
+                foreach (var (note, dur) in melody)
                 {
-                    if (cancellationToken.IsCancellationRequested) break;
-
+                    if (token.IsCancellationRequested) break;
                     try
                     {
                         if (note == Note.Rest)
-                        {
-                            // Sử dụng cancellation-aware sleep
-                            cancellationToken.WaitHandle.WaitOne(duration);
-                        }
+                            token.WaitHandle.WaitOne(dur);
                         else
-                        {
-                            // Điều chỉnh duration để tránh overlap
-                            var adjustedDuration = Math.Max(duration - NOTE_SEPARATION, 50);
-                            Console.Beep((int)note, adjustedDuration);
-                        }
+                            Console.Beep((int)note, Math.Max(dur - NOTE_SEP, 50));
 
-                        // Khoảng nghỉ nhỏ giữa các nốt để tránh overlap
-                        if (!cancellationToken.IsCancellationRequested)
-                        {
-                            cancellationToken.WaitHandle.WaitOne(NOTE_SEPARATION);
-                        }
+                        if (!token.IsCancellationRequested)
+                            token.WaitHandle.WaitOne(NOTE_SEP);
                     }
-                    catch (OperationCanceledException)
-                    {
-                        break;
-                    }
+                    catch (OperationCanceledException) { break; }
                     catch
                     {
-                        // Ignore individual beep errors và tiếp tục
-                        if (!cancellationToken.IsCancellationRequested)
-                        {
-                            cancellationToken.WaitHandle.WaitOne(50);
-                        }
+                        if (!token.IsCancellationRequested) token.WaitHandle.WaitOne(50);
                     }
                 }
-
-                // Khoảng nghỉ giữa các lần lặp melody
-                if (!cancellationToken.IsCancellationRequested)
-                {
-                    cancellationToken.WaitHandle.WaitOne(500);
-                }
+                if (!token.IsCancellationRequested) token.WaitHandle.WaitOne(500);
             }
         }
-        catch (OperationCanceledException)
-        {
-            // Background music was cancelled - this is expected
-        }
-        catch
-        {
-            // Ignore other audio errors
-        }
+        catch { }
+        finally { _isMusicPlaying = false; }
     }
 }

@@ -11,7 +11,7 @@ class FlappyBirdGame
 {
     static void Main()
     {
-        Console.CursorVisible = false;
+        try { Console.CursorVisible = false; } catch { }
 
         // Chỉ thiết lập kích thước cửa sổ trên Windows
         if (OperatingSystem.IsWindows())
@@ -27,10 +27,24 @@ class FlappyBirdGame
             }
         }
 
-        // Load persisted settings before first render
-        SettingsSerializer.Load(GameSettings.Instance);
+        // Register MP3 effect files
+        AudioManager.SetAudioDir(Path.Combine(AppContext.BaseDirectory, "Resources", "Audio"));
 
-        if (GameSettings.Instance.MusicEnabled)
+        // Scan font resources before loading settings so Apply() can work immediately
+        string fontsDir = Path.Combine(AppContext.BaseDirectory, "Resources", "Fonts");
+        FontManager.Scan(fontsDir);
+
+        // Load persisted settings; always write defaults file on first run
+        SettingsSerializer.Load(GameSettings.Instance);
+        SettingsSerializer.Save(GameSettings.Instance);
+
+        // Load audio offset calibration (per-sound start-offset trim)
+        AudioManager.LoadAudioOffset();
+        var gs = GameSettings.Instance;
+        if (!string.IsNullOrEmpty(gs.FontFaceName))
+            FontManager.Apply(gs.FontFaceName, gs.FontSize);
+
+        if (gs.MusicEnabled)
             AudioManager.StartBackgroundMusic(HarryPotter.Melody);
 
         // Main menu loop
@@ -67,6 +81,8 @@ class FlappyBirdGame
                     break;
 
                 case MenuAction.Exit:
+                    SettingsSerializer.Save(GameSettings.Instance);
+                    FontManager.Cleanup();
                     AudioManager.StopAllSounds();
                     Console.ResetColor();
                     Console.Clear();

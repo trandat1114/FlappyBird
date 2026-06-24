@@ -40,4 +40,23 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy audio files to output so AudioManager can play them at runtime -->
+    <Content Include="Resources\Audio\*.mp3" CopyToOutputDirectory="PreserveNewest">
+      <Link>Resources\Audio\%(Filename)%(Extension)</Link>
+    </Content>
+
+    <!-- Copy font files to output so FontManager.Scan() can find them at runtime -->
+    <Content Include="Resources\Fonts\**\*.ttf" CopyToOutputDirectory="PreserveNewest">
+      <Link>Resources\Fonts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="Resources\Fonts\**\*.otf" CopyToOutputDirectory="PreserveNewest">
+      <Link>Resources\Fonts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
 </Project>

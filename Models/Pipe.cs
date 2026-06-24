@@ -1,5 +1,3 @@
-using System;
-
 namespace FlappyBird.Models
 {
     /// <summary>
@@ -7,10 +5,12 @@ namespace FlappyBird.Models
     /// </summary>
     public class Pipe
     {
-        public int X { get; set; }
-        public int TopHeight { get; set; }
-        public int BottomHeight { get; set; }
-        public int GapSize { get; set; }
+        public int  X           { get; set; }
+        public int  TopHeight   { get; set; }
+        public int  BottomHeight { get; set; }
+        public int  GapSize     { get; set; }
+        /// <summary>True once the bird has passed this pipe's right edge — prevents double-scoring.</summary>
+        public bool Scored      { get; set; } = false;
         
         public Pipe(int x, int gapSize, int gameHeight, Random random)
         {

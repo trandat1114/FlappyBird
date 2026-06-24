@@ -28,6 +28,7 @@ public sealed class ConsoleBeepAudioProvider : IAudioProvider
 
         Task.Factory.StartNew(() =>
         {
+            if (!OperatingSystem.IsWindows()) return;
             try
             {
                 Thread.CurrentThread.Priority = ThreadPriority.Normal;
@@ -67,6 +68,7 @@ public sealed class ConsoleBeepAudioProvider : IAudioProvider
 
         Task.Factory.StartNew(async () =>
         {
+            if (!OperatingSystem.IsWindows()) return;
             try
             {
                 Thread.CurrentThread.Priority = ThreadPriority.AboveNormal;

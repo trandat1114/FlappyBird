@@ -13,12 +13,18 @@ public class GameSettings
     public static GameSettings Instance { get; private set; } = new();
 
     public Language     Language      { get; set; } = Language.English;
+    public int          TargetFps     { get; set; } = 60;   // 60 or 120
     public bool         MusicEnabled  { get; set; } = true;
     public int          MusicVolume   { get; set; } = 80;   // 0-100 step 10
     public int          EffectsVolume { get; set; } = 60;   // 0-100 step 10
     public BorderStyle  BorderStyle   { get; set; } = BorderStyle.Double;
     public ConsoleColor PrimaryColor  { get; set; } = ConsoleColor.Cyan;
     public ConsoleColor AccentColor   { get; set; } = ConsoleColor.Yellow;
+
+    /// <summary>Face name of the active console font. Empty = system default.</summary>
+    public string FontFaceName { get; set; } = "";
+    /// <summary>Console font cell height in pixels.</summary>
+    public int    FontSize     { get; set; } = 16;
 
     /// <summary>Derived from colors+border — returns "Custom" when no preset matches.</summary>
     public string CurrentThemeName =>
