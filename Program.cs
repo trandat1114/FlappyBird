@@ -13,18 +13,20 @@ class FlappyBirdGame
     {
         try { Console.CursorVisible = false; } catch { }
 
-        // Chỉ thiết lập kích thước cửa sổ trên Windows
+        // Ensure a usable minimum window size; do not force 80×24 so the game is responsive.
         if (OperatingSystem.IsWindows())
         {
             try
             {
-                Console.SetWindowSize(80, 24);
-                Console.SetBufferSize(80, 24);
+                int minW = FlappyBird.Models.GameState.GameWidth + 2;
+                int minH = FlappyBird.Models.GameState.GameHeight + 5;
+                if (Console.WindowWidth < minW || Console.WindowHeight < minH)
+                {
+                    Console.SetWindowSize(Math.Max(Console.WindowWidth, minW),
+                                         Math.Max(Console.WindowHeight, minH));
+                }
             }
-            catch
-            {
-                // Ignore if we can't set window size
-            }
+            catch { /* terminal may not support resize — proceed anyway */ }
         }
 
         // Register MP3 effect files

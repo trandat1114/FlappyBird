@@ -7,8 +7,7 @@ namespace FlappyBird.Game.Modes.SinglePlayer
 {
     public class SinglePlayerGameOverMenu(SinglePlayerRenderer renderer)
     {
-        private const int GAME_AREA_TOP = 0;
-        private const int FOOTER_TOP    = GAME_AREA_TOP + GameState.GameHeight; // = 20
+        private static int FooterTop => SinglePlayerRenderer.OriginY + GameState.GameHeight;
 
         private bool     _show              = false;
         private int      _selectedIndex     = 0;
@@ -50,7 +49,7 @@ namespace FlappyBird.Game.Modes.SinglePlayer
             var bs   = panel.Borders;
             var opts = GameOverOptions;
 
-            Console.SetCursorPosition(0, FOOTER_TOP);
+            Console.SetCursorPosition(0, FooterTop);
 
             // Row 0: top border
             Console.ForegroundColor = panel.BorderColor;

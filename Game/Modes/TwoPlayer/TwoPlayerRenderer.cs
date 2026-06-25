@@ -4,19 +4,21 @@ using FlappyBird.Settings;
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Renderer TwoPlayer — side-by-side layout (80×24).
-    /// P1: cols 0-39, P2: cols 40-79, footer: row 23.
-    /// Game area per panel: rows 1-21 (21 rows, ≈ 1:1 with GameHeight=20).
+    /// Renderer TwoPlayer — side-by-side layout, fully responsive.
+    /// All dimensions are computed from _buf.Width / _buf.Height at render time.
+    /// P1: cols 0..(PanelW-1), P2: cols PanelW..(Width-1).
     /// </summary>
     public class TwoPlayerRenderer
     {
-        // ── LAYOUT ──────────────────────────────────────────────────────────
-        private const int CONSOLE_W   = TwoPlayerBuffer.CONSOLE_WIDTH;         // 80
-        private const int PANEL_W     = CONSOLE_W / 2;                         // 40
-        private const int INNER_W     = PANEL_W - 2;                           // 38
-        private const int GAME_DISP_H = 21;                                    // rows 1..21 inside panel
-        private const int FOOTER_Y    = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT - 1; // 23
-        private const int P2_X        = PANEL_W;                               // P2 starts at col 40
+        // ── LAYOUT (computed each frame from buffer dimensions) ───────────────
+        private int ConsoleW   => _buf.Width;
+        private int PanelW     => ConsoleW / 2;
+        private int InnerW     => PanelW - 2;
+        // Panels: rows 0..(Height-2); footer: row Height-1.
+        private int GameDispH  => Math.Max(5, _buf.Height - 3); // H - footer(1) - topBorder(1) - botBorder(1)
+        private int FooterY    => _buf.Height - 1;
+        private int P2X        => PanelW;
+        private int BotBorderY => _buf.Height - 2;
 
         // ── CHARACTERS ──────────────────────────────────────────────────────
         private const char PipeChar = '█';
@@ -25,24 +27,21 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private readonly TwoPlayerBuffer _buf;
 
-        private readonly char[,] _p1 = new char[GAME_DISP_H, INNER_W];
-        private readonly char[,] _p2 = new char[GAME_DISP_H, INNER_W];
-        private readonly char[,] _bg = new char[GAME_DISP_H, INNER_W];
+        // Lazily allocated — reallocated when layout dimensions change
+        private char[,] _p1 = new char[1, 1];
+        private char[,] _p2 = new char[1, 1];
+        private char[,] _bg = new char[1, 1];
+        private int _lastGameDispH = -1, _lastInnerW = -1;
 
-        public TwoPlayerRenderer(TwoPlayerBuffer buf)
-        {
-            _buf = buf;
-            for (int y = 0; y < GAME_DISP_H; y++)
-                for (int x = 0; x < INNER_W; x++)
-                    _bg[y, x] = (x + y) % 8 == 0 ? BgDot : ' ';
-        }
+        public TwoPlayerRenderer(TwoPlayerBuffer buf) => _buf = buf;
 
         // ── PUBLIC API ───────────────────────────────────────────────────────
 
         public void RenderDualSideBySideToBuffer(GameState p1, GameState p2)
         {
-            RenderPlayerPanel(p1, "PLAYER 1", 0,    _p1);
-            RenderPlayerPanel(p2, "PLAYER 2", P2_X, _p2);
+            EnsureGameBuffers();
+            RenderPlayerPanel(p1, "PLAYER 1", 0,   _p1);
+            RenderPlayerPanel(p2, "PLAYER 2", P2X, _p2);
         }
 
         public void RenderDualPlayerFooterToBuffer(GameState p1, GameState p2)
@@ -70,76 +69,87 @@ namespace FlappyBird.Game.Modes.TwoPlayer
                 ? (DateTime.Now.Millisecond < 500 ? ConsoleColor.Red : ConsoleColor.Yellow)
                 : value <= 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
 
-            OverlayDigit(digit, 0,    color);
-            OverlayDigit(digit, P2_X, color);
+            OverlayDigit(digit, 0,   color);
+            OverlayDigit(digit, P2X, color);
         }
 
         // ── PRIVATE – PANEL ──────────────────────────────────────────────────
 
         private void RenderPlayerPanel(GameState gs, string label, int xOff, char[,] gameBuf)
         {
-            var pc = GameSettings.Instance.PrimaryColor;
+            int iw  = InnerW;
+            int gdh = GameDispH;
+            var pc  = GameSettings.Instance.PrimaryColor;
 
             // Row 0: top border with centred label
-            string topInner = BuildTopInner(label);
-            _buf.WriteToBuffer(xOff,               0, '╔', pc);
-            for (int x = 0; x < INNER_W; x++)
-                _buf.WriteToBuffer(xOff + 1 + x,   0, topInner[x], pc);
-            _buf.WriteToBuffer(xOff + PANEL_W - 1, 0, '╗', pc);
+            string topInner = BuildTopInner(label, iw);
+            _buf.WriteToBuffer(xOff,                  0, '╔', pc);
+            for (int x = 0; x < iw; x++)
+                _buf.WriteToBuffer(xOff + 1 + x,      0, topInner[x], pc);
+            _buf.WriteToBuffer(xOff + PanelW - 1,     0, '╗', pc);
 
-            // Rows 1..GAME_DISP_H: game content
-            BuildGameContent(gameBuf, gs);
-            FlushContent(gameBuf, xOff);
+            // Rows 1..gdh: game content
+            BuildGameContent(gameBuf, gs, gdh, iw);
+            FlushContent(gameBuf, xOff, gdh, iw);
 
-            // Overlay "GAME OVER!" at vertical centre when player is dead
             if (gs.GameOver)
-            {
-                int midRow = 1 + GAME_DISP_H / 2;  // row 11
-                WriteOverlay(xOff + 1, midRow, INNER_W, "GAME OVER!", ConsoleColor.Red);
-            }
+                WriteOverlay(xOff + 1, 1 + gdh / 2, iw, "GAME OVER!", ConsoleColor.Red);
 
-            // Row 22: bottom border
-            _buf.WriteToBuffer(xOff,               22, '╚', pc);
-            for (int x = 1; x < PANEL_W - 1; x++)
-                _buf.WriteToBuffer(xOff + x,       22, '═', pc);
-            _buf.WriteToBuffer(xOff + PANEL_W - 1, 22, '╝', pc);
+            // Bottom border
+            int botRow = BotBorderY;
+            _buf.WriteToBuffer(xOff,                  botRow, '╚', pc);
+            for (int x = 1; x < PanelW - 1; x++)
+                _buf.WriteToBuffer(xOff + x,          botRow, '═', pc);
+            _buf.WriteToBuffer(xOff + PanelW - 1,     botRow, '╝', pc);
         }
 
-        private static string BuildTopInner(string label)
+        private static string BuildTopInner(string label, int innerW)
         {
-            string lbl     = $" {label} ";
-            int    padLeft  = (INNER_W - lbl.Length) / 2;
-            int    padRight = INNER_W - padLeft - lbl.Length;
+            string lbl      = $" {label} ";
+            int    padLeft  = (innerW - lbl.Length) / 2;
+            int    padRight = innerW - padLeft - lbl.Length;
             return new string('═', padLeft) + lbl + new string('═', padRight);
         }
 
-        // ── BUILD GAME CONTENT ────────────────────────────────────────────────
+        // ── GAME BUFFERS ─────────────────────────────────────────────────────
 
-        private void BuildGameContent(char[,] buf, GameState gs)
+        private void EnsureGameBuffers()
         {
-            Buffer.BlockCopy(_bg, 0, buf, 0, GAME_DISP_H * INNER_W * sizeof(char));
+            int h = GameDispH, w = InnerW;
+            if (h == _lastGameDispH && w == _lastInnerW) return;
+
+            _p1 = new char[h, w];
+            _p2 = new char[h, w];
+            _bg = new char[h, w];
+            _lastGameDispH = h;
+            _lastInnerW    = w;
+
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    _bg[y, x] = (x + y) % 8 == 0 ? BgDot : ' ';
+        }
+
+        private void BuildGameContent(char[,] buf, GameState gs, int gdh, int iw)
+        {
+            Buffer.BlockCopy(_bg, 0, buf, 0, gdh * iw * sizeof(char));
 
             foreach (var pipe in gs.Pipes)
             {
-                int cx = ScaleX(pipe.X);
-                if (cx < 0 || cx >= INNER_W) continue;
+                int cx = ScaleX(pipe.X, iw);
+                if (cx < 0 || cx >= iw) continue;
 
-                int topH   = ScaleY(pipe.TopHeight);
-                int botCap = ScaleY(GameState.GameHeight - pipe.BottomHeight - 1);
+                int topH   = ScaleY(pipe.TopHeight, gdh);
+                int botCap = ScaleY(GameState.GameHeight - pipe.BottomHeight - 1, gdh);
 
-                for (int y = 0; y < topH && y < GAME_DISP_H; y++)
-                    DrawPipeRow(buf, y, cx);
-                if (topH < GAME_DISP_H)
-                    DrawCapRow(buf, topH, cx, '▀');
-                if (botCap > topH && botCap < GAME_DISP_H)
-                    DrawCapRow(buf, botCap, cx, '▄');
-                for (int y = botCap + 1; y < GAME_DISP_H; y++)
-                    DrawPipeRow(buf, y, cx);
+                for (int y = 0; y < topH && y < gdh; y++)      DrawPipeRow(buf, y, cx, iw);
+                if (topH < gdh)                                 DrawCapRow(buf, topH, cx, '▀', iw);
+                if (botCap > topH && botCap < gdh)              DrawCapRow(buf, botCap, cx, '▄', iw);
+                for (int y = botCap + 1; y < gdh; y++)         DrawPipeRow(buf, y, cx, iw);
             }
 
-            int bx = ScaleX(GameState.BirdX);
-            int by = ScaleY(gs.BirdY);
-            if ((uint)bx < INNER_W && (uint)by < GAME_DISP_H)
+            int bx = ScaleX(GameState.BirdX, iw);
+            int by = ScaleY(gs.BirdY, gdh);
+            if ((uint)bx < iw && (uint)by < gdh)
             {
                 buf[by, bx] = gs.BirdVelocity < -0.12f ? '^'
                              : gs.BirdVelocity >  0.12f ? 'v'
@@ -152,31 +162,31 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             }
         }
 
-        private static void DrawPipeRow(char[,] buf, int y, int cx)
+        private static void DrawPipeRow(char[,] buf, int y, int cx, int iw)
         {
-            if (cx - 1 >= 0)      buf[y, cx - 1] = PipeChar;
-            buf[y, cx]            = PipeChar;
-            if (cx + 1 < INNER_W) buf[y, cx + 1] = PipeChar;
+            if (cx - 1 >= 0)  buf[y, cx - 1] = PipeChar;
+            buf[y, cx]        = PipeChar;
+            if (cx + 1 < iw)  buf[y, cx + 1] = PipeChar;
         }
 
-        private static void DrawCapRow(char[,] buf, int y, int cx, char cap)
+        private static void DrawCapRow(char[,] buf, int y, int cx, char cap, int iw)
         {
             for (int dx = -2; dx <= 2; dx++)
             {
                 int x = cx + dx;
-                if ((uint)x < INNER_W) buf[y, x] = cap;
+                if ((uint)x < iw) buf[y, x] = cap;
             }
         }
 
-        private void FlushContent(char[,] buf, int xOff)
+        private void FlushContent(char[,] buf, int xOff, int gdh, int iw)
         {
             var pc = GameSettings.Instance.PrimaryColor;
-            for (int y = 0; y < GAME_DISP_H; y++)
+            for (int y = 0; y < gdh; y++)
             {
                 _buf.WriteToBuffer(xOff,               y + 1, '║', pc);
-                for (int x = 0; x < INNER_W; x++)
+                for (int x = 0; x < iw; x++)
                     _buf.WriteToBuffer(xOff + 1 + x,   y + 1, buf[y, x], CharColor(buf[y, x]));
-                _buf.WriteToBuffer(xOff + PANEL_W - 1, y + 1, '║', pc);
+                _buf.WriteToBuffer(xOff + PanelW - 1,  y + 1, '║', pc);
             }
         }
 
@@ -195,8 +205,10 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private void OverlayDigit(string[] rows, int panelXOff, ConsoleColor color)
         {
-            int startY = 1 + (GAME_DISP_H - rows.Length) / 2;
-            int startX = panelXOff + 1 + (INNER_W - rows[0].Length) / 2;
+            int iw  = InnerW;
+            int gdh = GameDispH;
+            int startY = 1 + (gdh - rows.Length) / 2;
+            int startX = panelXOff + 1 + (iw - rows[0].Length) / 2;
             for (int r = 0; r < rows.Length; r++)
                 for (int c = 0; c < rows[r].Length; c++)
                     if (rows[r][c] != ' ')
@@ -205,16 +217,17 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private void WriteFooterRow(string text, ConsoleColor fg)
         {
-            for (int i = 0; i < CONSOLE_W; i++)
-                _buf.WriteToBuffer(i, FOOTER_Y,
+            int w = _buf.Width, y = FooterY;
+            for (int i = 0; i < w; i++)
+                _buf.WriteToBuffer(i, y,
                     i < text.Length ? text[i] : ' ',
                     i < text.Length ? fg : ConsoleColor.DarkGray);
         }
 
         // ── HELPERS ──────────────────────────────────────────────────────────
 
-        private static int ScaleX(int gx) => (int)(gx * INNER_W / (float)GameState.GameWidth);
-        private static int ScaleY(int gy) => (int)(gy * GAME_DISP_H / (float)GameState.GameHeight);
+        private static int ScaleX(int gx, int iw)  => (int)(gx * iw  / (float)GameState.GameWidth);
+        private static int ScaleY(int gy, int gdh) => (int)(gy * gdh / (float)GameState.GameHeight);
 
         private static ConsoleColor CharColor(char ch) => ch switch
         {

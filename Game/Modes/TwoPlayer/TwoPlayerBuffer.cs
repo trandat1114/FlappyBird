@@ -3,54 +3,79 @@ using System.Text;
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Double-buffer chống flicker cho TwoPlayer (side-by-side layout, 80×24).
-    /// Flush() gom các char liên tiếp cùng màu thành một Console.Write(string).
+    /// Double-buffer anti-flicker for TwoPlayer (side-by-side layout).
+    /// Dimensions are dynamic — call Resize() at the start of each Render()
+    /// to adapt when the user resizes the terminal window.
     /// </summary>
     public class TwoPlayerBuffer
     {
-        public const int CONSOLE_WIDTH        = 80;
-        public const int TOTAL_DISPLAY_HEIGHT = 24;
+        // Current terminal dimensions (updated by Resize())
+        public int Width  { get; private set; }
+        public int Height { get; private set; }
 
-        private char[,]         _prev   = new char[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
-        private char[,]         _cur    = new char[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
-        private ConsoleColor[,] _prevFg = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
-        private ConsoleColor[,] _curFg  = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
+        private char[,]         _prev   = new char[1, 1];
+        private char[,]         _cur    = new char[1, 1];
+        private ConsoleColor[,] _prevFg = new ConsoleColor[1, 1];
+        private ConsoleColor[,] _curFg  = new ConsoleColor[1, 1];
 
-        private readonly StringBuilder _sb = new(CONSOLE_WIDTH);
+        private readonly StringBuilder _sb = new(200);
 
         public bool BufferInitialized { get; private set; } = false;
 
-        public void InitializeBuffers()
+        public TwoPlayerBuffer()
         {
-            _prev   = new char[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
-            _cur    = new char[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
-            _prevFg = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
-            _curFg  = new ConsoleColor[TOTAL_DISPLAY_HEIGHT, CONSOLE_WIDTH];
+            Width  = Math.Max(40, Console.WindowWidth);
+            Height = Math.Max(16, Console.WindowHeight);
+            AllocArrays();
+        }
 
-            for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
-                for (int x = 0; x < CONSOLE_WIDTH; x++)
+        // ── Lifecycle ──────────────────────────────────────────────────────────
+
+        public void InitializeBuffers() => AllocArrays();
+
+        /// <summary>
+        /// Checks console dimensions and reallocates if changed.
+        /// Returns true when a resize occurred (caller should Console.Clear + ForceFullRedraw).
+        /// </summary>
+        public bool Resize()
+        {
+            int w = Math.Max(40, Console.WindowWidth);
+            int h = Math.Max(16, Console.WindowHeight);
+            if (w == Width && h == Height) return false;
+            Width  = w;
+            Height = h;
+            AllocArrays();
+            return true;
+        }
+
+        private void AllocArrays()
+        {
+            _prev   = new char[Height, Width];
+            _cur    = new char[Height, Width];
+            _prevFg = new ConsoleColor[Height, Width];
+            _curFg  = new ConsoleColor[Height, Width];
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
                 {
-                    _prev[y, x]   = '\0';
-                    _cur[y, x]    = ' ';
-                    _prevFg[y, x] = ConsoleColor.White;
-                    _curFg[y, x]  = ConsoleColor.White;
+                    _cur[y, x]   = ' ';
+                    _curFg[y, x] = ConsoleColor.White;
                 }
-
+            ForceFullRedraw();
             BufferInitialized = true;
         }
 
         /// <summary>Reset _prev to '\0' so FlushBufferToConsole redraws all cells after Console.Clear().</summary>
         public void ForceFullRedraw()
         {
-            for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
-                for (int x = 0; x < CONSOLE_WIDTH; x++)
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
                     _prev[y, x] = '\0';
         }
 
         public void ClearCurrentBuffer()
         {
-            for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
-                for (int x = 0; x < CONSOLE_WIDTH; x++)
+            for (int y = 0; y < Height; y++)
+                for (int x = 0; x < Width; x++)
                 {
                     _cur[y, x]   = ' ';
                     _curFg[y, x] = ConsoleColor.White;
@@ -59,7 +84,7 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         public void WriteToBuffer(int x, int y, char ch, ConsoleColor fg = ConsoleColor.White)
         {
-            if ((uint)x < CONSOLE_WIDTH && (uint)y < TOTAL_DISPLAY_HEIGHT)
+            if ((uint)x < Width && (uint)y < Height)
             {
                 _cur[y, x]   = ch;
                 _curFg[y, x] = fg;
@@ -68,23 +93,26 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         public void FlushBufferToConsole()
         {
-            for (int y = 0; y < TOTAL_DISPLAY_HEIGHT; y++)
+            // Snapshot terminal bounds once — prevents crash when terminal shrinks between Resize() and here.
+            int bufW = Console.BufferWidth;
+            int bufH = Console.BufferHeight;
+
+            for (int y = 0; y < Height; y++)
             {
+                if (y >= bufH) break;
                 int x = 0;
-                while (x < CONSOLE_WIDTH)
+                while (x < Width)
                 {
+                    if (x >= bufW) break;
                     if (_cur[y, x] == _prev[y, x] && _curFg[y, x] == _prevFg[y, x])
-                    {
-                        x++;
-                        continue;
-                    }
+                    { x++; continue; }
 
                     Console.SetCursorPosition(x, y);
                     ConsoleColor activeColor = _curFg[y, x];
                     Console.ForegroundColor = activeColor;
                     _sb.Clear();
 
-                    while (x < CONSOLE_WIDTH)
+                    while (x < Width && x < bufW)
                     {
                         bool changed = _cur[y, x] != _prev[y, x] || _curFg[y, x] != _prevFg[y, x];
                         if (!changed) break;
@@ -104,11 +132,9 @@ namespace FlappyBird.Game.Modes.TwoPlayer
                         x++;
                     }
 
-                    if (_sb.Length > 0)
-                        Console.Write(_sb.ToString());
+                    if (_sb.Length > 0) Console.Write(_sb.ToString());
                 }
             }
-
             Console.ResetColor();
         }
     }

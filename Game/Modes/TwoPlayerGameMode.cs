@@ -107,11 +107,12 @@ namespace FlappyBird.Game.Modes
 
         public override void Render()
         {
-            if (firstRender)
+            bool resized = buffer.Resize(); // realloc if terminal was resized
+            if (resized || firstRender)
             {
                 Console.Clear();
                 Console.SetCursorPosition(0, 0);
-                buffer.ForceFullRedraw(); // sync _prev after Clear so all cells are redrawn
+                buffer.ForceFullRedraw();
                 firstRender = false;
             }
 

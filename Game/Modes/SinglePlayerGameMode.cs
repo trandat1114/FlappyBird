@@ -1,6 +1,7 @@
 using System;
 using FlappyBird.AI;
 using FlappyBird.Models;
+using FlappyBird.Rendering;
 using FlappyBird.Utils;
 using FlappyBird.Game.Modes.SinglePlayer;
 using FlappyBird.Audio;
@@ -74,6 +75,15 @@ namespace FlappyBird.Game.Modes
 
         public override void Render()
         {
+            // On resize: clear immediately to stop the terminal from scrolling,
+            // then force a full redraw this same frame.
+            if (ConsoleLayout.HasResized())
+            {
+                Console.Clear();
+                SinglePlayerRenderer.InvalidateScreen(gameState);
+                gameState.ForceFullRedraw = true;
+            }
+
             // Nếu đang hiển thị game over menu
             if (gameOverMenu.ShowGameOverMenu)
             {

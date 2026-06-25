@@ -9,8 +9,8 @@ namespace FlappyBird.Game.Modes.TwoPlayer
     /// </summary>
     public class TwoPlayerGameOverMenu(TwoPlayerBuffer buffer)
     {
-        private const int CONSOLE_W = TwoPlayerBuffer.CONSOLE_WIDTH;            // 80
-        private const int FOOTER_Y  = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT - 1; // 23
+        private int ConsoleW => _buf.Width;
+        private int FooterY  => _buf.Height - 1;
 
         private readonly TwoPlayerBuffer _buf = buffer;
 
@@ -71,8 +71,8 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             pos = WriteSeg(pos, "  │  ",  ConsoleColor.White);
             pos = WriteSeg(pos, (sel1 ? " ► " : "   ") + opts[1],
                                sel1 ? ConsoleColor.Yellow : ConsoleColor.Gray);
-            while (pos < CONSOLE_W)
-                _buf.WriteToBuffer(pos++, FOOTER_Y, ' ', ConsoleColor.DarkGray);
+            while (pos < ConsoleW)
+                _buf.WriteToBuffer(pos++, FooterY, ' ', ConsoleColor.DarkGray);
         }
 
         // ── Input ────────────────────────────────────────────────────────────
@@ -119,9 +119,9 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private int WriteSeg(int startPos, string text, ConsoleColor fg)
         {
-            for (int i = 0; i < text.Length && startPos + i < CONSOLE_W; i++)
-                _buf.WriteToBuffer(startPos + i, FOOTER_Y, text[i], fg);
-            return Math.Min(startPos + text.Length, CONSOLE_W);
+            for (int i = 0; i < text.Length && startPos + i < ConsoleW; i++)
+                _buf.WriteToBuffer(startPos + i, FooterY, text[i], fg);
+            return Math.Min(startPos + text.Length, ConsoleW);
         }
     }
 

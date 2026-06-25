@@ -1,40 +1,36 @@
 namespace FlappyBird.Rendering;
 
-/// <summary>
-/// Utility that flushes a <see cref="ConsoleBuffer"/> from a legacy char[,] source array —
-/// bridges existing GameState.PreviousScreen diff logic until Phase 3 migration is complete.
-/// </summary>
 public static class DiffRenderer
 {
-    /// <summary>
-    /// Writes only cells that differ between <paramref name="newBuf"/> and
-    /// <paramref name="prevBuf"/>, updating <paramref name="prevBuf"/> in-place.
-    /// </summary>
-    /// <param name="newBuf">Current frame content.</param>
-    /// <param name="prevBuf">Previous frame — mutated to match newBuf for changed cells.</param>
-    /// <param name="originY">Console row where row 0 of the buffer is drawn.</param>
-    /// <summary>
-    /// Flushes changed cells. When <paramref name="colorFn"/> is provided, sets
-    /// <see cref="Console.ForegroundColor"/> per character (only on color change to reduce
-    /// the number of property-set calls).
-    /// </summary>
-    public static void Flush(char[,] newBuf, char[,] prevBuf, int originY = 0,
+    public static void Flush(char[,] newBuf, char[,] prevBuf, int originY = 0, int originX = 0,
         Func<char, ConsoleColor>? colorFn = null)
     {
         int rows = newBuf.GetLength(0);
         int cols = newBuf.GetLength(1);
         ConsoleColor cur = Console.ForegroundColor;
 
+        // Snapshot buffer bounds once — prevents crash when terminal is smaller than game area.
+        int bufW = Console.BufferWidth;
+        int bufH = Console.BufferHeight;
+
         for (int y = 0; y < rows; y++)
         {
+            int absY = originY + y;
+            if ((uint)absY >= (uint)bufH) continue; // row is outside the terminal buffer
+
             int x = 0;
             while (x < cols)
             {
+                int absX = originX + x;
+                if (absX >= bufW) break; // rest of this row is off-screen — skip
+
                 if (newBuf[y, x] == prevBuf[y, x]) { x++; continue; }
 
-                Console.SetCursorPosition(x, originY + y);
+                Console.SetCursorPosition(absX, absY);
                 while (x < cols && newBuf[y, x] != prevBuf[y, x])
                 {
+                    if (originX + x >= bufW) break; // would overflow terminal row
+
                     if (colorFn is not null)
                     {
                         ConsoleColor c = colorFn(newBuf[y, x]);

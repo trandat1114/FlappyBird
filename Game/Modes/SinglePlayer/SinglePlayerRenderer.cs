@@ -9,9 +9,13 @@ namespace FlappyBird.Game.Modes.SinglePlayer
     public class SinglePlayerRenderer
     {
         // === LAYOUT CONSTANTS ===
-        // No header; game area starts at row 0. Footer starts at row 20.
         private const int GAME_AREA_TOP = 0;
-        private const int FOOTER_TOP = GAME_AREA_TOP + GameState.GameHeight; // = 20
+        private const int FOOTER_ROWS   = 4; // top border + score + controls + bottom border
+        private const int FOOTER_TOP    = GAME_AREA_TOP + GameState.GameHeight;
+
+        // Center the game in the terminal when the window is larger.
+        public static int OriginX => Math.Max(0, (Console.WindowWidth  - GameState.GameWidth)           / 2);
+        public static int OriginY => Math.Max(0, (Console.WindowHeight - (GameState.GameHeight + FOOTER_ROWS)) / 2);
 
         // === ASCII ART CHARACTERS ===
         private const char BirdChar = '♦';
@@ -88,9 +92,21 @@ namespace FlappyBird.Game.Modes.SinglePlayer
             Console.Clear();
         }
 
+        /// <summary>
+        /// Resets diff-tracking to ' ' so FlushDiff redraws all cells on the next frame.
+        /// Call this immediately after Console.Clear() on terminal resize.
+        /// </summary>
+        public static void InvalidateScreen(GameState gs)
+        {
+            for (int y = 0; y < GameState.GameHeight; y++)
+                for (int x = 0; x < GameState.GameWidth; x++)
+                    gs.PreviousScreen[y, x] = ' ';
+        }
+
         public void RenderGameOverOverlay()
         {
-            Console.SetCursorPosition(GameState.GameWidth / 2 - 6, GAME_AREA_TOP + GameState.GameHeight / 2);
+            Console.SetCursorPosition(OriginX + GameState.GameWidth / 2 - 6,
+                                      OriginY + GAME_AREA_TOP + GameState.GameHeight / 2);
             Console.ForegroundColor = ConsoleColor.Red;
             Console.BackgroundColor = ConsoleColor.Black;
             Console.Write(" GAME OVER! ");
@@ -162,7 +178,10 @@ namespace FlappyBird.Game.Modes.SinglePlayer
         }
 
         private static void FlushDiff(char[,] newBuf, GameState gs)
-            => DiffRenderer.Flush(newBuf, gs.PreviousScreen, originY: GAME_AREA_TOP, colorFn: CharColor);
+            => DiffRenderer.Flush(newBuf, gs.PreviousScreen,
+                   originY: GAME_AREA_TOP + OriginY,
+                   originX: OriginX,
+                   colorFn: CharColor);
 
         private static ConsoleColor CharColor(char ch) => ch switch
         {
@@ -181,14 +200,30 @@ namespace FlappyBird.Game.Modes.SinglePlayer
             var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
             ConsoleColor ctrlColor = gs.GameStarted ? ConsoleColor.Green : ConsoleColor.Yellow;
 
-            Console.SetCursorPosition(0, FOOTER_TOP);
-            panel.PrintTop();
-            BuildStatusLine(gs, panel);
+            int footerY = OriginY + FOOTER_TOP;
+
+            // Row 0: Top border
+            Console.SetCursorPosition(OriginX, footerY);
+            Console.ForegroundColor = panel.BorderColor;
+            Console.Write(panel.BuildTop());
+            Console.ResetColor();
+
+            // Row 1: Status line
+            Console.SetCursorPosition(OriginX, footerY + 1);
+            string statusContent = gs.GameStarted
+                ? $"  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}"
+                : $"  {L.Get(L.STATUS_READY)}";
+            panel.PrintRow(statusContent, ConsoleColor.Yellow);
+
+            // Row 2: Controls
             string ctrlContent = gs.GameStarted
                 ? $" {L.Get(L.CTRL_MANUAL)}  │  {L.Get(L.CTRL_JUMP)}  │  {L.Get(L.CTRL_EXIT)}"
                 : $" {L.Get(L.CTRL_START)}  │  {L.Get(L.CTRL_EXIT)}";
+            Console.SetCursorPosition(OriginX, footerY + 2);
             panel.PrintRow(ctrlContent, ctrlColor);
-            // Use Write (not WriteLine) on last row to prevent terminal scroll in 24-row buffer
+
+            // Row 3: Bottom border (use Write to prevent scroll on last line)
+            Console.SetCursorPosition(OriginX, footerY + 3);
             Console.ForegroundColor = panel.BorderColor;
             Console.Write(panel.BuildBottom());
             Console.ResetColor();
@@ -196,16 +231,13 @@ namespace FlappyBird.Game.Modes.SinglePlayer
 
         private static void UpdateFooterLine(GameState gs)
         {
-            Console.SetCursorPosition(0, FOOTER_TOP + 1);
-            BuildStatusLine(gs, GameSettings.Instance.CreatePanel(GameState.GameWidth));
-        }
-
-        private static void BuildStatusLine(GameState gs, UIPanel panel)
-        {
-            string content = gs.GameStarted
+            var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
+            int footerY = OriginY + FOOTER_TOP;
+            Console.SetCursorPosition(OriginX, footerY + 1);
+            string statusContent = gs.GameStarted
                 ? $"  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}"
                 : $"  {L.Get(L.STATUS_READY)}";
-            panel.PrintRow(content, ConsoleColor.Yellow);
+            panel.PrintRow(statusContent, ConsoleColor.Yellow);
         }
 
         private static bool IsUiChanged(GameState gs) =>
