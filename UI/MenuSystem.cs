@@ -94,14 +94,15 @@ namespace FlappyBird.UI
         private static void DrawFull()
         {
             var items = menuItems;
-            var panel = GameSettings.Instance.CreatePanel(66);
+            var panel = GameSettings.Instance.CreatePanel(78);
 
             Console.Clear();
             Console.CursorVisible = false;
 
             // Title bar (rows 0-2: top border, title, separator)
+            int iw = panel.InnerWidth;
             string centeredTitle = L.Get(L.MENU_TITLE)
-                .PadLeft((64 + L.Get(L.MENU_TITLE).Length) / 2).PadRight(64);
+                .PadLeft((iw + L.Get(L.MENU_TITLE).Length) / 2).PadRight(iw);
             Console.ForegroundColor = panel.BorderColor;
             Console.WriteLine(panel.BuildTop());
             Console.ForegroundColor = ConsoleColor.White;
@@ -132,7 +133,7 @@ namespace FlappyBird.UI
         private static void UpdateSelection()
         {
             var items = menuItems;
-            var panel = GameSettings.Instance.CreatePanel(66);
+            var panel = GameSettings.Instance.CreatePanel(78);
 
             if (_prevSelected >= 0 && selectable[_prevSelected])
             {

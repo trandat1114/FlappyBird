@@ -12,7 +12,7 @@ namespace FlappyBird.Models
         public DifficultyState Difficulty { get; } = new();
 
         // === GAME DIMENSIONS - PHÙ HỢP VỚI MENU DESIGN ===
-        public const int GameWidth = 66;  // Khớp với menu border width
+        public const int GameWidth = 78;  // Khớp với menu border width (panel 78, inner 76)
         public const int GameHeight = 20; // 20 game rows + 4 footer = 24 rows (no header)
         public const int BirdX = 8;       // Điều chỉnh vị trí chim phù hợp với width mới
 
@@ -31,7 +31,7 @@ namespace FlappyBird.Models
         
         // === PIPES AND DIFFICULTY - TỐI ƯU CHO WIDTH MỚI ===
         public List<Pipe> Pipes { get; set; } = new List<Pipe>();
-        public const int PipeSpacing = 35; // Điều chỉnh cho width 66: tối đa 2 ống trên màn hình
+        public const int PipeSpacing = 35; // Tối đa 2 ống trên màn hình (spawn khi lastPipe.X < GameWidth-35)
         public int LastPipeX { get; set; } = GameWidth;
         public int DifficultyLevel { get; set; } = 1; // Bắt đầu từ level 1
         public int PipeSpeed { get; set; } = 4; // Chậm hơn ban đầu để học

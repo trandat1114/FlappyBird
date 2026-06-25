@@ -9,7 +9,7 @@ namespace FlappyBird.Game.Modes.SinglePlayer
     public class SinglePlayerValidator
     {
         // === MENU CONSISTENCY CONSTANTS ===
-        private const int MENU_BORDER_WIDTH = 66;  // Khớp chính xác với menu border
+        private const int MENU_BORDER_WIDTH = 78;  // Khớp chính xác với menu border
         private const int GAME_DISPLAY_HEIGHT = 20; // Chiều cao vùng game (no header)
         private const int TOTAL_DISPLAY_HEIGHT = 24; // Tổng chiều cao (game + header + footer)
 

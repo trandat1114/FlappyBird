@@ -12,9 +12,6 @@ namespace FlappyBird.Game.Modes
         private readonly GameState player2State = new();
         private bool gameStarted = false;
 
-        // === MENU CONSISTENCY CONSTANTS ===
-        private const int MENU_BORDER_WIDTH = 66;  // Khớp chính xác với menu border
-
         // === COMPONENTS ===
         private readonly TwoPlayerBuffer buffer;
         private readonly TwoPlayerRenderer renderer;
@@ -38,9 +35,6 @@ namespace FlappyBird.Game.Modes
 
         public override void Initialize()
         {
-            // Validate menu consistency như SinglePlayerGameMode
-            ValidateMenuConsistency();
-
             player1State.Reset();
             player2State.Reset();
 
@@ -54,17 +48,6 @@ namespace FlappyBird.Game.Modes
 
             gameStarted = false;
             firstRender = true; // Reset first render flag
-        }
-
-        /// <summary>
-        /// Validate rằng game dimensions khớp hoàn toàn với menu - tương tự SinglePlayerGameMode
-        /// </summary>
-        private void ValidateMenuConsistency()
-        {
-            if (GameState.GameWidth != MENU_BORDER_WIDTH)
-            {
-                throw new InvalidOperationException($"Game width ({GameState.GameWidth}) does not match menu border width ({MENU_BORDER_WIDTH})");
-            }
         }
 
         /// <summary>
@@ -124,57 +107,35 @@ namespace FlappyBird.Game.Modes
 
         public override void Render()
         {
-            // Clear screen completely on first render to remove previous menu
             if (firstRender)
             {
                 Console.Clear();
                 Console.SetCursorPosition(0, 0);
+                buffer.ForceFullRedraw(); // sync _prev after Clear so all cells are redrawn
                 firstRender = false;
             }
-            
-            // Initialize buffers if needed
-            if (!buffer.BufferInitialized)
-            {
-                buffer.InitializeBuffers();
-            }
-            
-            // Clear current buffer for new frame
-            buffer.ClearCurrentBuffer();
-            
-            // Nếu đang hiển thị game over menu - tương tự SinglePlayerGameMode
-            if (gameOverMenu.ShowGameOverMenu)
-            {
-                // Luôn render panels để giữ game state hiển thị
-                renderer.RenderDualStackedScreensToBuffer(player1State, player2State);
 
-                // Cho phép người chơi nhìn thấy kết quả một chút trước khi hiển thị menu
-                if (DateTime.Now - gameOverMenu.GameOverTime > TimeSpan.FromMilliseconds(800))
-                {
-                    gameOverMenu.RenderGameOverMenuToBuffer(player1State, player2State);
-                }
-                else
-                {
-                    renderer.RenderGameOverOverlayToBuffer();
-                }
-            }
-            else if (countdown.IsCountingDown)
+            if (!buffer.BufferInitialized)
+                buffer.InitializeBuffers();
+
+            buffer.ClearCurrentBuffer();
+
+            // Always render both panels; dead panels auto-show "GAME OVER!" overlay
+            renderer.RenderDualSideBySideToBuffer(player1State, player2State);
+
+            if (gameOverMenu.ShowGameOverMenu
+                && DateTime.Now - gameOverMenu.GameOverTime > TimeSpan.FromMilliseconds(800))
             {
-                // Render hai màn hình như bình thường
-                renderer.RenderDualStackedScreensToBuffer(player1State, player2State);
-                // Hiển thị số countdown lớn ở giữa mỗi màn hình player
-                renderer.RenderCountdownOverlayToBuffer(countdown.CountdownValue);
-                // Render footer
-                renderer.RenderDualPlayerFooterToBuffer(player1State, player2State);
+                // Game over options replace the footer row
+                gameOverMenu.RenderGameOverMenuToBuffer(player1State, player2State);
             }
             else
             {
-                // Render dual stacked screens với thiết kế nhất quán
-                renderer.RenderDualStackedScreensToBuffer(player1State, player2State);
-                // Render footer với thông tin cả hai player
+                if (countdown.IsCountingDown)
+                    renderer.RenderCountdownOverlayToBuffer(countdown.CountdownValue);
                 renderer.RenderDualPlayerFooterToBuffer(player1State, player2State);
             }
-            
-            // Flush buffer to console - only changed characters
+
             buffer.FlushBufferToConsole();
         }
 

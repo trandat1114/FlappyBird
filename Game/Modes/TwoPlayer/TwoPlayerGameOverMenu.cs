@@ -5,16 +5,12 @@ using FlappyBird.Settings;
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
-    /// Game Over panel for TwoPlayer — rendered at the footer (rows FOOTER_Y … FOOTER_Y+5)
-    /// via TwoPlayerBuffer diff-write (not Console.Write directly).
+    /// Game Over for TwoPlayer — single footer row (row 23) via TwoPlayerBuffer.
     /// </summary>
     public class TwoPlayerGameOverMenu(TwoPlayerBuffer buffer)
     {
-        // ── Layout ──────────────────────────────────────────────────────────
-        private const int BORDER_W = TwoPlayerBuffer.MENU_BORDER_WIDTH;   // 66
-        private const int TOTAL_H  = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT; // 36
-        private const int FOOTER_H = 4;
-        private const int FOOTER_Y = TOTAL_H - FOOTER_H;                  // 20
+        private const int CONSOLE_W = TwoPlayerBuffer.CONSOLE_WIDTH;            // 80
+        private const int FOOTER_Y  = TwoPlayerBuffer.TOTAL_DISPLAY_HEIGHT - 1; // 23
 
         private readonly TwoPlayerBuffer _buf = buffer;
 
@@ -48,32 +44,35 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         // ── Render ───────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Single-row game over footer at row 23:
+        ///   [result info]  │  [► Play Again]  │  [Main Menu]
+        /// </summary>
         public void RenderGameOverMenuToBuffer(GameState p1, GameState p2)
         {
             bool   isTie    = p1.GameOver && p2.GameOver && p1.Score == p2.Score;
             string winner   = GetWinner(p1, p2);
             string pts      = L.Get(L.GO_POINTS);
-            var    bs       = GameSettings.Instance.GetBorderSet();
+            var    opts     = Options;
             var    winColor = isTie ? ConsoleColor.Yellow : ConsoleColor.Green;
 
-            // Row 0: top border ╔══╗ (Red)
-            WriteBorder(FOOTER_Y, bs.TopLeft, bs.Horiz, bs.TopRight, ConsoleColor.Red);
+            string result = isTie
+                ? $" TIE!  P1:{p1.Score,3} {pts}  P2:{p2.Score,3} {pts}"
+                : $" {winner} wins  P1:{p1.Score,3}  P2:{p2.Score,3} {pts}";
 
-            // Row 1: winner / tie headline + scores
-            string headline = isTie
-                ? $"  {L.Get(L.TP_TIE_EXCLAIM)}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}"
-                : $"  {L.Get(L.TP_WINNER)}: {winner}  │  P1: {p1.Score,3} {pts}  │  P2: {p2.Score,3} {pts}";
-            WriteRow(FOOTER_Y + 1, headline, winColor, ConsoleColor.Red);
+            bool sel0 = _selectedIndex == 0;
+            bool sel1 = _selectedIndex == 1;
 
-            // Row 2: options + controls hint
-            var opts = Options;
-            string opt0 = _selectedIndex == 0 ? $"> {opts[0],-20}" : $"  {opts[0],-20}";
-            string opt1 = _selectedIndex == 1 ? $"> {opts[1],-18}" : $"  {opts[1],-18}";
-            WriteRowWithSelection(FOOTER_Y + 2,
-                $"  {opt0}  │  {opt1}  │  {L.Get(L.TP_GO_CONTROLS)}", _selectedIndex, winColor);
-
-            // Row 3: bottom border ╚══╝
-            WriteBorder(FOOTER_Y + 3, bs.BotLeft, bs.Horiz, bs.BotRight, winColor);
+            int pos = 0;
+            pos = WriteSeg(pos, result,   winColor);
+            pos = WriteSeg(pos, "  │  ",  ConsoleColor.White);
+            pos = WriteSeg(pos, (sel0 ? " ► " : "   ") + opts[0],
+                               sel0 ? ConsoleColor.Yellow : ConsoleColor.Gray);
+            pos = WriteSeg(pos, "  │  ",  ConsoleColor.White);
+            pos = WriteSeg(pos, (sel1 ? " ► " : "   ") + opts[1],
+                               sel1 ? ConsoleColor.Yellow : ConsoleColor.Gray);
+            while (pos < CONSOLE_W)
+                _buf.WriteToBuffer(pos++, FOOTER_Y, ' ', ConsoleColor.DarkGray);
         }
 
         // ── Input ────────────────────────────────────────────────────────────
@@ -84,6 +83,8 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             {
                 case ConsoleKey.UpArrow:
                 case ConsoleKey.DownArrow:
+                case ConsoleKey.LeftArrow:
+                case ConsoleKey.RightArrow:
                     _selectedIndex = _selectedIndex == 0 ? 1 : 0;
                     return GameOverMenuAction.None;
 
@@ -116,40 +117,11 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             return L.Get(L.TP_PLAYING);
         }
 
-        private void WriteBorder(int y, char l, char m, char r, ConsoleColor c)
+        private int WriteSeg(int startPos, string text, ConsoleColor fg)
         {
-            _buf.WriteToBuffer(0, y, l, c);
-            for (int x = 1; x < BORDER_W - 1; x++)
-                _buf.WriteToBuffer(x, y, m, c);
-            _buf.WriteToBuffer(BORDER_W - 1, y, r, c);
-        }
-
-        private void WriteRow(int y, string text, ConsoleColor fg, ConsoleColor borderColor)
-        {
-            var bs = GameSettings.Instance.GetBorderSet();
-            _buf.WriteToBuffer(0, y, bs.Vert, borderColor);
-            for (int i = 0; i < BORDER_W - 2; i++)
-                _buf.WriteToBuffer(i + 1, y, i < text.Length ? text[i] : ' ', fg);
-            _buf.WriteToBuffer(BORDER_W - 1, y, bs.Vert, borderColor);
-        }
-
-        private void WriteRowWithSelection(int y, string text, int sel, ConsoleColor borderColor)
-        {
-            var bs = GameSettings.Instance.GetBorderSet();
-            _buf.WriteToBuffer(0, y, bs.Vert, borderColor);
-            int half = (BORDER_W - 2) / 2;
-            for (int i = 0; i < BORDER_W - 2; i++)
-            {
-                char ch = i < text.Length ? text[i] : ' ';
-                bool isLeft  = i < half;
-                ConsoleColor fg =
-                    (isLeft  && sel == 0 && text.StartsWith("  >")) ||
-                    (!isLeft && sel == 1)
-                        ? ConsoleColor.Yellow
-                        : ConsoleColor.White;
-                _buf.WriteToBuffer(i + 1, y, ch, fg);
-            }
-            _buf.WriteToBuffer(BORDER_W - 1, y, bs.Vert, borderColor);
+            for (int i = 0; i < text.Length && startPos + i < CONSOLE_W; i++)
+                _buf.WriteToBuffer(startPos + i, FOOTER_Y, text[i], fg);
+            return Math.Min(startPos + text.Length, CONSOLE_W);
         }
     }
 

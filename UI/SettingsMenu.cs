@@ -89,7 +89,7 @@ public static class SettingsMenu
     {
         Console.Clear();
         var s     = GameSettings.Instance;
-        var panel = s.CreatePanel(66);
+        var panel = s.CreatePanel(78);
 
         Console.SetCursorPosition(0, 0);
         panel.PrintTop();
@@ -198,7 +198,7 @@ public static class SettingsMenu
     {
         Console.Clear();
         var s     = GameSettings.Instance;
-        var panel = s.CreatePanel(66);
+        var panel = s.CreatePanel(78);
 
         Console.SetCursorPosition(0, 0);
         panel.PrintTop();
@@ -305,7 +305,7 @@ public static class SettingsMenu
     {
         Console.Clear();
         var s     = GameSettings.Instance;
-        var panel = s.CreatePanel(66);
+        var panel = s.CreatePanel(78);
         var bs    = s.GetBorderSet();
 
         Console.SetCursorPosition(0, 0);
@@ -345,7 +345,7 @@ public static class SettingsMenu
 
     /// <summary>
     /// Writes a single border row with a colored ■ preview for a color value.
-    /// Inner width = 64: 4 (indent+indicator) + 13 (label) + 3 (" : ") + 2 ("■ ") + 42 (name pad) = 64.
+    /// Inner width = 76 (panel 78): lead(22) + "■ "(2) + name.PadRight(52) = 76.
     /// </summary>
     private static void WriteColorRow(BorderSet bs, int idx, string label, ConsoleColor previewColor, ConsoleColor borderColor)
     {
@@ -364,7 +364,7 @@ public static class SettingsMenu
         Console.Write("■ ");                                  // ■ + space = 2
 
         Console.ForegroundColor = textFg;
-        Console.Write(PaletteName(previewColor).PadRight(40));    // 40
+        Console.Write(PaletteName(previewColor).PadRight(52));    // 76 - 22 - 2 = 52
 
         Console.ForegroundColor = borderColor;
         Console.WriteLine(bs.Vert);                               // 1
@@ -459,7 +459,7 @@ public static class SettingsMenu
     {
         Console.Clear();
         var s     = GameSettings.Instance;
-        var panel = s.CreatePanel(66);
+        var panel = s.CreatePanel(78);
 
         Console.SetCursorPosition(0, 0);
         panel.PrintTop();

@@ -61,14 +61,14 @@ namespace FlappyBird.Game.Modes.SinglePlayer
             Console.WriteLine(panel.BuildRow(
                 $"  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}"));
 
-            // Row 2: options with per-option highlight (32 + │ + 31 = 64 inner chars)
+            // Row 2: options with per-option highlight (38 + │ + 37 = 76 inner chars)
             Console.ForegroundColor = panel.BorderColor;
             Console.Write(bs.Vert);
 
             bool sel0 = _selectedIndex == 0;
             if (sel0) { Console.ForegroundColor = ConsoleColor.Black; Console.BackgroundColor = ConsoleColor.Yellow; }
             else Console.ForegroundColor = ConsoleColor.White;
-            Console.Write(((sel0 ? "  ► " : "    ") + opts[0]).PadRight(32));
+            Console.Write(((sel0 ? "  ► " : "    ") + opts[0]).PadRight(38));
             Console.ResetColor();
 
             Console.ForegroundColor = panel.BorderColor;
@@ -77,7 +77,7 @@ namespace FlappyBird.Game.Modes.SinglePlayer
             bool sel1 = _selectedIndex == 1;
             if (sel1) { Console.ForegroundColor = ConsoleColor.Black; Console.BackgroundColor = ConsoleColor.Yellow; }
             else Console.ForegroundColor = ConsoleColor.White;
-            Console.Write(((sel1 ? "  ► " : "    ") + opts[1]).PadRight(31));
+            Console.Write(((sel1 ? "  ► " : "    ") + opts[1]).PadRight(37));
             Console.ResetColor();
 
             Console.ForegroundColor = panel.BorderColor;
