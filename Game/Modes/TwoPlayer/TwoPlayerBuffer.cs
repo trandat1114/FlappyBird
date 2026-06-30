@@ -1,15 +1,16 @@
 using System.Text;
+using FlappyBird.Rendering;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
     /// <summary>
     /// Double-buffer anti-flicker for TwoPlayer (side-by-side layout).
-    /// Dimensions are dynamic — call Resize() at the start of each Render()
-    /// to adapt when the user resizes the terminal window.
+    /// Respects ConsoleLayout constraints: min 24×78, max 24×80.
+    /// Call Resize() at the start of each Render() to adapt when user resizes terminal.
     /// </summary>
     public class TwoPlayerBuffer
     {
-        // Current terminal dimensions (updated by Resize())
+        // Current terminal dimensions (updated by Resize(), respects ConsoleLayout constraints)
         public int Width  { get; private set; }
         public int Height { get; private set; }
 
@@ -24,8 +25,8 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         public TwoPlayerBuffer()
         {
-            Width  = Math.Max(40, Console.WindowWidth);
-            Height = Math.Max(16, Console.WindowHeight);
+            Width  = ConsoleLayout.W;
+            Height = ConsoleLayout.H;
             AllocArrays();
         }
 
@@ -34,13 +35,13 @@ namespace FlappyBird.Game.Modes.TwoPlayer
         public void InitializeBuffers() => AllocArrays();
 
         /// <summary>
-        /// Checks console dimensions and reallocates if changed.
+        /// Checks console dimensions (via ConsoleLayout) and reallocates if changed.
         /// Returns true when a resize occurred (caller should Console.Clear + ForceFullRedraw).
         /// </summary>
         public bool Resize()
         {
-            int w = Math.Max(40, Console.WindowWidth);
-            int h = Math.Max(16, Console.WindowHeight);
+            int w = ConsoleLayout.W;
+            int h = ConsoleLayout.H;
             if (w == Width && h == Height) return false;
             Width  = w;
             Height = h;

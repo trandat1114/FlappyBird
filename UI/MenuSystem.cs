@@ -15,21 +15,23 @@ namespace FlappyBird.UI
             L.Get(L.MENU_SECTION_HUMAN),    // 0  header
             L.Get(L.MENU_SINGLE_PLAYER),    // 1
             L.Get(L.MENU_TWO_PLAYER),       // 2
-            "",                              // 3  spacer
-            L.Get(L.MENU_SECTION_AI),       // 4  header
-            "       Dual AI Comparison",     // 5
-            "       Split Screen Real-time", // 6
-            "       AI Tournament",          // 7
-            "",                              // 8  spacer
-            L.Get(L.MENU_SETTINGS),         // 9
-            "",                              // 10 spacer
-            L.Get(L.MENU_QUIT),             // 11
+            "       Custom Game",            // 3
+            "",                              // 4  spacer
+            L.Get(L.MENU_SECTION_AI),       // 5  header
+            "       Dual AI Comparison",     // 6
+            "       Split Screen Real-time", // 7
+            "       AI Tournament",          // 8
+            "",                              // 9  spacer
+            L.Get(L.MENU_SETTINGS),         // 10
+            "",                              // 11 spacer
+            L.Get(L.MENU_QUIT),             // 12
         ];
 
         private static readonly MenuAction[] menuActions = [
             MenuAction.None,
             MenuAction.SinglePlayer,
             MenuAction.TwoPlayer,
+            MenuAction.CustomGame,
             MenuAction.None,
             MenuAction.None,
             MenuAction.DualAI,
@@ -42,7 +44,7 @@ namespace FlappyBird.UI
         ];
 
         private static readonly bool[] selectable = [
-            false, true, true, false, false, true, true, true, false, true, false, true
+            false, true, true, true, false, false, true, true, true, false, true, false, true
         ];
 
         // ── Public entry point ────────────────────────────────────────────────
@@ -118,13 +120,23 @@ namespace FlappyBird.UI
                 Console.WriteLine();
             }
 
-            // Controls footer (rows 15-17: separator, hint, bottom)
+            // Controls footer: separator, hint, then padding rows to fill 24 rows total,
+            // then bottom border. Row 23 uses Write (not WriteLine) to prevent scroll.
             Console.ForegroundColor = panel.BorderColor;
             Console.WriteLine(panel.BuildSep());
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.WriteLine(panel.BuildRow("  ↑↓: Select   Enter: Confirm   ESC: Exit"));
+
+            // Empty rows to pad menu to 24 rows (rows 18-22)
+            for (int i = 0; i < 5; i++)
+            {
+                Console.ForegroundColor = panel.BorderColor;
+                Console.WriteLine(panel.BuildEmptyRow());
+            }
+
+            // Row 23: bottom border — Write (not WriteLine) to avoid scroll at last row
             Console.ForegroundColor = panel.BorderColor;
-            Console.WriteLine(panel.BuildBottom());
+            Console.Write(panel.BuildBottom());
             Console.ResetColor();
         }
 
@@ -218,13 +230,13 @@ namespace FlappyBird.UI
         private static ConsoleColor ItemColor(int i)
         {
             if (!selectable[i])
-                return (i == 0 || i == 4) ? ConsoleColor.Green : ConsoleColor.DarkGray;
+                return (i == 0 || i == 5) ? ConsoleColor.Green : ConsoleColor.DarkGray;
 
             return i switch
             {
-                1 or 2      => ConsoleColor.Cyan,
-                5 or 6 or 7 => ConsoleColor.Magenta,
-                11          => ConsoleColor.Red,
+                1 or 2 or 3 => ConsoleColor.Cyan,
+                6 or 7 or 8 => ConsoleColor.Magenta,
+                12          => ConsoleColor.Red,
                 _           => ConsoleColor.White,
             };
         }

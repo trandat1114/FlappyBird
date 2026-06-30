@@ -15,6 +15,7 @@ namespace FlappyBird.Game.Modes
     public class SinglePlayerGameMode : GameModeBase
     {
         private readonly GameState gameState = new();
+        private readonly CustomGameConfig? _config;
 
         // === COMPONENTS ===
         private readonly SinglePlayerRenderer renderer;
@@ -23,8 +24,9 @@ namespace FlappyBird.Game.Modes
         private readonly SinglePlayerInitializer initializer;
 
         // === CONSTRUCTOR ===
-        public SinglePlayerGameMode()
+        public SinglePlayerGameMode(CustomGameConfig? config = null)
         {
+            _config = config;
             renderer = new SinglePlayerRenderer();
             gameOverMenu = new SinglePlayerGameOverMenu(renderer);
             inputHandler = new SinglePlayerInputHandler(gameOverMenu);
@@ -34,15 +36,28 @@ namespace FlappyBird.Game.Modes
         public override void Initialize()
         {
             gameState.Reset();
-
-            // Initialize game với border dimensions chính xác
             initializer.InitializeGameWithMenuConsistentBorders(gameState, Random);
-
-            // Initialize screen buffer với kích thước tối ưu
+            ApplyConfig(gameState);
             renderer.InitializeScreen(gameState);
-
-            // Render lần đầu với thiết kế 100% nhất quán với menu
             renderer.RenderWithConsistentDesign(gameState);
+        }
+
+        private void ApplyConfig(GameState gs)
+        {
+            if (_config == null) return;
+            if (_config.ManualMode)
+            {
+                gs.Difficulty.PipeSpeed    = _config.ManualSpeed;
+                gs.Difficulty.FixedGapSize = _config.ManualGap;
+                gs.Difficulty.Fixed        = true;
+                gs.PipeSpeed               = _config.ManualSpeed;
+            }
+            else if (_config.StartLevel > 1)
+            {
+                gs.Difficulty.SetLevel(_config.StartLevel);
+                gs.DifficultyLevel = gs.Difficulty.Level;
+                gs.PipeSpeed       = gs.Difficulty.PipeSpeed;
+            }
         }
 
         public override void Update()
@@ -188,9 +203,10 @@ namespace FlappyBird.Game.Modes
             // ShowGameOverMenu=false with old pipes still in the list.
             gameState.Reset();
             initializer.InitializeGameWithMenuConsistentBorders(gameState, Random);
-            Console.Clear(); // Immediate visual clear on input thread; RenderWithConsistentDesign re-clears on next frame
+            ApplyConfig(gameState);
+            Console.Clear();
             gameState.ForceFullRedraw = true;
-            gameOverMenu.ResetGameOverMenu(); // clear show flag last
+            gameOverMenu.ResetGameOverMenu();
         }
     }
 }

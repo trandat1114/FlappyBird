@@ -13,9 +13,10 @@ namespace FlappyBird.Game.Modes.SinglePlayer
         private const int FOOTER_ROWS   = 4; // top border + score + controls + bottom border
         private const int FOOTER_TOP    = GAME_AREA_TOP + GameState.GameHeight;
 
-        // Center the game in the terminal when the window is larger.
-        public static int OriginX => Math.Max(0, (Console.WindowWidth  - GameState.GameWidth)           / 2);
-        public static int OriginY => Math.Max(0, (Console.WindowHeight - (GameState.GameHeight + FOOTER_ROWS)) / 2);
+        // Align to left edge (col 0): game box is 78 cols, leaving 2 unused cols on the right.
+        // This keeps all coordinate math simple (no OriginX offset in calculations).
+        public static int OriginX => 0;
+        public static int OriginY => 0;
 
         // === ASCII ART CHARACTERS ===
         private const char BirdChar = '♦';
@@ -202,25 +203,23 @@ namespace FlappyBird.Game.Modes.SinglePlayer
 
             int footerY = OriginY + FOOTER_TOP;
 
-            // Row 0: Top border
+            // Row 0: Top border (use Write, not WriteLine, to prevent scroll)
             Console.SetCursorPosition(OriginX, footerY);
             Console.ForegroundColor = panel.BorderColor;
             Console.Write(panel.BuildTop());
             Console.ResetColor();
 
-            // Row 1: Status line
-            Console.SetCursorPosition(OriginX, footerY + 1);
+            // Row 1: Status line (use WriteRowAt to avoid WriteLine scroll)
             string statusContent = gs.GameStarted
                 ? $"  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}"
                 : $"  {L.Get(L.STATUS_READY)}";
-            panel.PrintRow(statusContent, ConsoleColor.Yellow);
+            panel.WriteRowAt(OriginX, footerY + 1, statusContent, ConsoleColor.Yellow);
 
-            // Row 2: Controls
+            // Row 2: Controls (use WriteRowAt to avoid WriteLine scroll)
             string ctrlContent = gs.GameStarted
                 ? $" {L.Get(L.CTRL_MANUAL)}  │  {L.Get(L.CTRL_JUMP)}  │  {L.Get(L.CTRL_EXIT)}"
                 : $" {L.Get(L.CTRL_START)}  │  {L.Get(L.CTRL_EXIT)}";
-            Console.SetCursorPosition(OriginX, footerY + 2);
-            panel.PrintRow(ctrlContent, ctrlColor);
+            panel.WriteRowAt(OriginX, footerY + 2, ctrlContent, ctrlColor);
 
             // Row 3: Bottom border (use Write to prevent scroll on last line)
             Console.SetCursorPosition(OriginX, footerY + 3);
@@ -233,11 +232,10 @@ namespace FlappyBird.Game.Modes.SinglePlayer
         {
             var panel = GameSettings.Instance.CreatePanel(GameState.GameWidth);
             int footerY = OriginY + FOOTER_TOP;
-            Console.SetCursorPosition(OriginX, footerY + 1);
             string statusContent = gs.GameStarted
                 ? $"  Score: {gs.Score,3}  │  Level: {gs.DifficultyLevel,2}  │  Speed: {gs.PipeSpeed}  │  Gap: {gs.GetCurrentGapSize(),2}"
                 : $"  {L.Get(L.STATUS_READY)}";
-            panel.PrintRow(statusContent, ConsoleColor.Yellow);
+            panel.WriteRowAt(OriginX, footerY + 1, statusContent, ConsoleColor.Yellow);
         }
 
         private static bool IsUiChanged(GameState gs) =>

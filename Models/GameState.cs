@@ -31,10 +31,12 @@ namespace FlappyBird.Models
         
         // === PIPES AND DIFFICULTY - TỐI ƯU CHO WIDTH MỚI ===
         public List<Pipe> Pipes { get; set; } = new List<Pipe>();
-        public const int PipeSpacing = 35; // Tối đa 2 ống trên màn hình (spawn khi lastPipe.X < GameWidth-35)
+        // Instance property (not const) so TwoPlayer can set a wider spacing to
+        // compensate for its 38-col panel (vs SP's 78-col game area, scale ≈0.49×).
+        public int PipeSpacing { get; set; } = 35;
         public int LastPipeX { get; set; } = GameWidth;
         public int DifficultyLevel { get; set; } = 1; // Bắt đầu từ level 1
-        public int PipeSpeed { get; set; } = 4; // Chậm hơn ban đầu để học
+        public int PipeSpeed { get; set; } = 3;
         
         // === GAP SIZE ĐỘNG - TỐI ƯU CHO HEIGHT MỚI ===
         public const int BaseGapSize = 7; // Gap phù hợp cho height 20

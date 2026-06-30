@@ -11,13 +11,14 @@ namespace FlappyBird.Game
         private static Thread? inputThread;
         private static volatile bool isRunning = false;
 
-        public static void StartGame(GameMode gameMode)
+        public static void StartGame(GameMode gameMode, FlappyBird.Models.CustomGameConfig? config = null)
         {
             Console.Clear();
             Console.ResetColor();
+            Console.CursorVisible = false;
             Console.SetCursorPosition(0, 0);
 
-            currentGameMode = GameModeFactory.CreateGameMode(gameMode);
+            currentGameMode = GameModeFactory.CreateGameMode(gameMode, config);
             currentGameMode.Initialize();
 
             isRunning = true;
@@ -81,8 +82,7 @@ namespace FlappyBird.Game
         }
 
         /// <summary>
-        /// Input loop tách riêng – 5ms sleep giảm latency từ 10ms xuống còn ~5ms
-        /// mà vẫn không block game loop.
+        /// Input loop tách riêng — 1ms sleep cho input latency ~1ms mà không block game loop.
         /// </summary>
         private static void InputLoop()
         {
@@ -93,7 +93,7 @@ namespace FlappyBird.Game
                     var key = Console.ReadKey(true);
                     currentGameMode.HandleInput(key);
                 }
-                Thread.Sleep(5);
+                Thread.Sleep(1);
             }
         }
     }

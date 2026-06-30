@@ -1,5 +1,6 @@
 using FlappyBird.Enum;
 using FlappyBird.Game.Modes;
+using FlappyBird.Models;
 
 namespace FlappyBird.Game
 {
@@ -8,16 +9,16 @@ namespace FlappyBird.Game
     /// </summary>
     public static class GameModeFactory
     {
-        public static IGameMode CreateGameMode(GameMode gameMode)
+        public static IGameMode CreateGameMode(GameMode gameMode, CustomGameConfig? config = null)
         {
             return gameMode switch
             {
-                GameMode.SinglePlayer => new SinglePlayerGameMode(),
-                GameMode.TwoPlayer => new TwoPlayerGameMode(),
-                GameMode.DualAI => new DualAIGameMode(),
+                GameMode.SinglePlayer => new SinglePlayerGameMode(config),
+                GameMode.TwoPlayer    => new TwoPlayerGameMode(),
+                GameMode.DualAI       => new DualAIGameMode(),
                 GameMode.SplitScreenAI => new SplitScreenAIGameMode(),
-                GameMode.AITournament => new AITournamentGameMode(),
-                _ => new SinglePlayerGameMode()
+                GameMode.AITournament  => new AITournamentGameMode(),
+                _ => new SinglePlayerGameMode(config)
             };
         }
         

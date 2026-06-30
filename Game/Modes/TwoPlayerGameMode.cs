@@ -1,5 +1,6 @@
 using FlappyBird.Models;
 using FlappyBird.Game.Modes.TwoPlayer;
+using FlappyBird.Rendering;
 
 namespace FlappyBird.Game.Modes
 {
@@ -57,11 +58,13 @@ namespace FlappyBird.Game.Modes
         {
             playerState.Pipes.Clear();
 
-            // Tạo pipe đầu tiên với spacing phù hợp với border width
+            // Scale PipeSpacing up to compensate for the 38-col panel displaying a 78-col game.
+            // 35 * (78/38) ≈ 72 → keeps visual pipe density the same as SinglePlayer.
+            playerState.PipeSpacing = 70;
+
             int initialPipeX = GameState.GameWidth - 1;
             playerState.Pipes.Add(new Pipe(initialPipeX, GameState.BaseGapSize, GameState.GameHeight, Random));
 
-            // Set last pipe position để spacing đều đặn
             playerState.LastPipeX = initialPipeX;
         }
 
@@ -107,7 +110,9 @@ namespace FlappyBird.Game.Modes
 
         public override void Render()
         {
-            bool resized = buffer.Resize(); // realloc if terminal was resized
+            bool resized = buffer.Resize(); // realloc if clamped dimensions changed
+            // Also detect raw resize (e.g. 85→80 cols stays clamped at 80 but display corrupts)
+            if (ConsoleLayout.HasResized()) resized = true;
             if (resized || firstRender)
             {
                 Console.Clear();

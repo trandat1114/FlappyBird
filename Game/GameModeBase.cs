@@ -82,7 +82,7 @@ namespace FlappyBird.Game
 
                 // Spawn ống mới nếu cần
                 if (gs.Pipes.Count == 0 ||
-                    gs.Pipes[gs.Pipes.Count - 1].X < GameState.GameWidth - GameState.PipeSpacing)
+                    gs.Pipes[gs.Pipes.Count - 1].X < GameState.GameWidth - gs.PipeSpacing)
                 {
                     gs.Pipes.Add(new Pipe(GameState.GameWidth - 1,
                         gs.GetCurrentGapSize(), GameState.GameHeight, Random));

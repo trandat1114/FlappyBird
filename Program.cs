@@ -2,8 +2,10 @@
 using FlappyBird.Audio.Song;
 using FlappyBird.Enum;
 using FlappyBird.Game;
+using FlappyBird.Rendering;
 using FlappyBird.Settings;
 using FlappyBird.UI;
+using FlappyBird.Models;
 
 namespace FlappyBird;
 
@@ -13,13 +15,14 @@ class FlappyBirdGame
     {
         try { Console.CursorVisible = false; } catch { }
 
-        // Ensure a usable minimum window size; do not force 80×24 so the game is responsive.
+        // Enforce consistent responsive constraints: min 24×78, max 24×80 (via ConsoleLayout)
+        // This ensures both single player and two player modes are compatible.
         if (OperatingSystem.IsWindows())
         {
             try
             {
-                int minW = FlappyBird.Models.GameState.GameWidth + 2;
-                int minH = FlappyBird.Models.GameState.GameHeight + 5;
+                int minW = ConsoleLayout.MIN_WIDTH;
+                int minH = ConsoleLayout.MIN_HEIGHT;
                 if (Console.WindowWidth < minW || Console.WindowHeight < minH)
                 {
                     Console.SetWindowSize(Math.Max(Console.WindowWidth, minW),
@@ -28,6 +31,9 @@ class FlappyBirdGame
             }
             catch { /* terminal may not support resize — proceed anyway */ }
         }
+
+        // Snapshot current dimensions so HasResized() doesn't trigger on first frame
+        ConsoleLayout.Snapshot();
 
         // Register MP3 effect files
         AudioManager.SetAudioDir(Path.Combine(AppContext.BaseDirectory, "Resources", "Audio"));
@@ -74,6 +80,12 @@ class FlappyBirdGame
 
                 case MenuAction.AITournament:
                     GameEngine.StartGame(GameModeFactory.MenuActionToGameMode(menuAction));
+                    break;
+
+                case MenuAction.CustomGame:
+                    CustomGameConfig? cfg = CustomGameMenu.Show();
+                    if (cfg != null)
+                        GameEngine.StartGame(GameMode.SinglePlayer, cfg);
                     break;
 
                 case MenuAction.Settings:
