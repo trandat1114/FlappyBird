@@ -1,175 +1,100 @@
-using System;
-using FlappyBird.AI;
-using FlappyBird.Models;
-using FlappyBird.Utils;
+using System.Diagnostics;
+using FlappyBird.Enum;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Game
 {
-    /// <summary>
-    /// Engine chính xử lý logic game
-    /// </summary>
     public static class GameEngine
     {
-        private static readonly Random Random = new Random();
-        
-        /// <summary>
-        /// Cập nhật logic game mỗi frame
-        /// </summary>
-        public static void Update(GameState gameState)
+        private static IGameMode? currentGameMode;
+        private static Thread? gameThread;
+        private static Thread? inputThread;
+        private static volatile bool isRunning = false;
+
+        public static void StartGame(GameMode gameMode, FlappyBird.Models.CustomGameConfig? config = null)
         {
-            gameState.FrameCounter++;
-            
-            // Chỉ cập nhật game khi đã bắt đầu
-            if (!gameState.GameStarted)
-            {
-                return; // Chim đứng yên cho đến khi nhấn space
-            }
-            
-            // Cập nhật độ khó dựa trên điểm số
-            gameState.UpdateDifficulty();
-            
-            // God mode - AI tự động điều khiển
-            if (gameState.GodMode && gameState.GameStarted)
-            {
-                GodModeAI.AutoControlBird(gameState);
-            }
-            
-            // Vật lý chim thích ứng God mode
-            UpdateBirdPhysics(gameState);
-            
-            // Di chuyển ống
-            UpdatePipes(gameState);
-            
-            // Kiểm tra va chạm
-            CheckCollision(gameState);
+            Console.Clear();
+            Console.ResetColor();
+            Console.CursorVisible = false;
+            Console.SetCursorPosition(0, 0);
+
+            currentGameMode = GameModeFactory.CreateGameMode(gameMode, config);
+            currentGameMode.Initialize();
+
+            isRunning = true;
+            gameThread = new Thread(GameLoop) { IsBackground = true };
+            inputThread = new Thread(InputLoop) { IsBackground = true };
+
+            gameThread.Start();
+            inputThread.Start();
+
+            gameThread.Join();
+            inputThread.Join();
+
+            currentGameMode.Cleanup();
         }
-        
+
+        public static void StopGame() => isRunning = false;
+
         /// <summary>
-        /// Cập nhật vật lý chim
+        /// Game loop với delta time chuẩn xác.
+        /// Dùng Stopwatch độ phân giải cao, hybrid sleep/spinwait để đạt đúng 60fps
+        /// mà không chiếm quá nhiều CPU.
         /// </summary>
-        private static void UpdateBirdPhysics(GameState gameState)
+        private static void GameLoop()
         {
-            // **FAIR PLAY**: God mode uses EXACT same physics as human player
-            float currentGravity = GameState.Gravity; // NO CHEATING - same gravity for everyone
-            
-            // Vật lý chim với gravity và velocity mượt mà hơn
-            gameState.BirdVelocity += currentGravity;
-            
-            // Giới hạn tốc độ rơi tối đa để tránh rơi quá nhanh
-            if (gameState.BirdVelocity > GameState.MaxFallSpeed)
+            int  fps              = GameSettings.Instance.TargetFps;
+            var  sw               = Stopwatch.StartNew();
+            long lastTicks        = sw.ElapsedTicks;
+            long targetTicks      = Stopwatch.Frequency / fps;
+            // At 120fps the frame time (8.33ms) is shorter than Sleep(1) resolution (~15ms),
+            // so we skip sleeping entirely and always use SpinWait for precise timing.
+            long spinThresholdTicks = fps >= 120
+                ? targetTicks               // never sleep at 120fps
+                : Stopwatch.Frequency / 400; // ~2.5ms sleep threshold at 60fps
+
+            while (isRunning && currentGameMode != null && !currentGameMode.IsGameOver())
             {
-                gameState.BirdVelocity = GameState.MaxFallSpeed;
-            }
-            
-            gameState.BirdY += (int)Math.Round(gameState.BirdVelocity);
-            
-            // **FAIR BOUNDARIES**: Same collision rules for everyone
-            if (gameState.BirdY < 1) 
-            {
-                gameState.BirdY = 1;
-                gameState.BirdVelocity = 0;
-            }
-            
-            if (gameState.BirdY >= GameState.GameHeight - 1)
-            {
-                // **NO SPECIAL TREATMENT**: God mode dies just like human player
-                gameState.GameOver = true;
-                return;
-            }
-        }
-        
-        /// <summary>
-        /// Cập nhật vị trí và tạo ống mới
-        /// </summary>
-        private static void UpdatePipes(GameState gameState)
-        {
-            // Di chuyển ống với tốc độ động theo độ khó
-            if (gameState.FrameCounter % gameState.PipeSpeed == 0)
-            {
-                for (int i = gameState.Pipes.Count - 1; i >= 0; i--)
+                long now = sw.ElapsedTicks;
+                long elapsed = now - lastTicks;
+
+                if (elapsed >= targetTicks)
                 {
-                    gameState.Pipes[i].X--;
-                    
-                    // Xóa ống đã qua
-                    if (gameState.Pipes[i].X < -2)
-                    {
-                        gameState.Pipes.RemoveAt(i);
-                        gameState.Score++;
-                    }
+                    // Tính deltaTime (giây), giới hạn ở 50ms để tránh spiral-of-death
+                    float dt = Math.Min((float)elapsed / Stopwatch.Frequency, 0.05f);
+                    GameTiming.DeltaTime = dt;
+
+                    currentGameMode.Update();
+                    currentGameMode.Render();
+                    lastTicks = now;
                 }
-                
-                // Tạo ống mới với gap size động và spacing được tối ưu
-                if (gameState.Pipes.Count == 0 || gameState.Pipes[gameState.Pipes.Count - 1].X < GameState.GameWidth - GameState.PipeSpacing)
+                else
                 {
-                    int currentGapSize = gameState.GetCurrentGapSize();
-                    gameState.Pipes.Add(new Pipe(GameState.GameWidth - 1, currentGapSize, GameState.GameHeight, Random));
+                    long remaining = targetTicks - (sw.ElapsedTicks - lastTicks);
+                    if (remaining > spinThresholdTicks)
+                        Thread.Sleep(1); // yield CPU khi còn thời gian đáng kể
+                    else
+                        Thread.SpinWait(50); // busy-wait ngắn cho độ chính xác cao
                 }
             }
+
+            isRunning = false;
         }
-        
+
         /// <summary>
-        /// Kiểm tra va chạm với ống và biên
+        /// Input loop tách riêng — 1ms sleep cho input latency ~1ms mà không block game loop.
         /// </summary>
-        private static void CheckCollision(GameState gameState)
+        private static void InputLoop()
         {
-            foreach (var pipe in gameState.Pipes)
+            while (isRunning && currentGameMode != null && !currentGameMode.IsGameOver())
             {
-                // Collision detection với một chút "forgiveness" để trải nghiệm tốt hơn
-                // Giảm hitbox một chút để người chơi cảm thấy "may mắn" khi vượt qua
-                if (GameState.BirdX >= pipe.X - 1 && GameState.BirdX <= pipe.X + 1) // Giảm từ 2 xuống 1
+                if (Console.KeyAvailable)
                 {
-                    if (gameState.BirdY <= pipe.TopHeight || gameState.BirdY >= GameState.GameHeight - pipe.BottomHeight - 1)
-                    {
-                        gameState.GameOver = true;
-                        
-                        // Nếu là God mode, ghi lại thông tin va chạm để học
-                        if (gameState.GodMode)
-                        {
-                            GameLogger.RecordGodModeFailure(gameState, pipe);
-                        }
-                        return;
-                    }
+                    var key = Console.ReadKey(true);
+                    currentGameMode.HandleInput(key);
                 }
+                Thread.Sleep(1);
             }
-            
-            // Kiểm tra va chạm với biên trên/dưới
-            if (gameState.BirdY <= 0 || gameState.BirdY >= GameState.GameHeight - 1)
-            {
-                gameState.GameOver = true;
-                
-                // Nếu là God mode, ghi lại thông tin va chạm với biên
-                if (gameState.GodMode)
-                {
-                    GameLogger.RecordGodModeBorderFailure(gameState);
-                }
-            }
-        }
-        
-        /// <summary>
-        /// Xử lý nhảy của chim
-        /// </summary>
-        public static void Jump(GameState gameState)
-        {
-            if (!gameState.GameStarted)
-            {
-                gameState.GameStarted = true; // Bắt đầu game khi nhấn space đầu tiên
-            }
-            
-            // Trong God mode, SPACE bị vô hiệu hóa
-            if (!gameState.GodMode)
-            {
-                gameState.BirdVelocity = GameState.JumpStrength; // Sử dụng jump strength gốc cho người chơi
-            }
-        }
-        
-        /// <summary>
-        /// Khởi tạo game với ống đầu tiên
-        /// </summary>
-        public static void InitializeGame(GameState gameState)
-        {
-            // Tạo ống đầu tiên với gap size lớn nhất để khuyến khích người chơi mới
-            gameState.Pipes.Clear();
-            gameState.Pipes.Add(new Pipe(GameState.GameWidth - 1, GameState.BaseGapSize, GameState.GameHeight, Random)); // Gap 9 cho level 1
         }
     }
 }

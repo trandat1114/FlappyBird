@@ -2,29 +2,42 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 
     <PackageId>FlappyBird</PackageId>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <Authors>TranDat1114</Authors>
-    <Description>A smooth 60 FPS Flappy Bird game for console</Description>
-    <Copyright>Copyright © 2025 YourName</Copyright>
-    <PackageTags>game;console;flappybird;retro</PackageTags>
+    <Description>A Flappy Bird game for console — with themes, two-player split screen, custom game configuration, and a persistent high score board.</Description>
+    <Copyright>Copyright © 2025 TranDat1114</Copyright>
+    <PackageTags>game;console;flappybird;retro;dotnet-tool</PackageTags>
     <RepositoryUrl>https://github.com/TranDat1114/FlappyBird</RepositoryUrl>
     <PackageProjectUrl>https://github.com/TranDat1114/FlappyBird</PackageProjectUrl>
-    
+
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageReleaseNotes>
-      v1.0.0:
-      - Initial release
-      - 60 FPS smooth gameplay
-      - Realistic physics with gravity
-      - Progressive difficulty system
-      - Cross-platform support
+v2.0.0 (2026-06-30):
+- Custom Game mode: configure starting level (1-10) or manual Speed/Gap; difficulty fixed in Manual mode
+- High Scores: persistent leaderboard of last 1000 sessions; paginated (10/page), filterable by mode
+- Settings persistence: all settings saved to %AppData%\FlappyBird\settings.json between sessions
+- Theme system: 4 built-in themes (Classic, Matrix, Neon, Retro) applied to menus and game borders
+- Dynamic border styles: game borders now follow the selected theme (Rounded, Single, ASCII, Double)
+- TwoPlayer pipe spacing fixed: visual density now matches SinglePlayer
+- Font management, audio calibration menu
+- English / Vietnamese localization
+- Responsive layout with resize detection
+
+v1.1.0:
+- Two Player local co-op (split screen, P1: W / P2: Up Arrow)
+- Audio: Harry Potter background music, sound effects (NAudio on Windows)
+- Dual AI Comparison mode (conservative vs aggressive, 10-round tournament)
+- God Mode rule-based AI; Q-Learning agent with JSONL training logger
+
+v1.0.0:
+- Initial release: Single Player, 60 FPS, realistic physics, progressive difficulty
     </PackageReleaseNotes>
 
     <!-- Global Tool Configuration -->
@@ -38,6 +51,25 @@
   <ItemGroup>
     <None Include="bird.png" Pack="true" PackagePath="\" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Copy audio files to output so AudioManager can play them at runtime -->
+    <Content Include="Resources\Audio\*.mp3" CopyToOutputDirectory="PreserveNewest">
+      <Link>Resources\Audio\%(Filename)%(Extension)</Link>
+    </Content>
+
+    <!-- Copy font files to output so FontManager.Scan() can find them at runtime -->
+    <Content Include="Resources\Fonts\**\*.ttf" CopyToOutputDirectory="PreserveNewest">
+      <Link>Resources\Fonts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+    <Content Include="Resources\Fonts\**\*.otf" CopyToOutputDirectory="PreserveNewest">
+      <Link>Resources\Fonts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
   </ItemGroup>
 
 </Project>

@@ -17,7 +17,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
         
     - name: Restore dependencies
       run: dotnet restore FlappyBird.csproj
@@ -68,21 +68,31 @@ jobs:
         files: bin/Release/*.nupkg
         generate_release_notes: true
         body: |
-          ## FlappyBird Console Game v${{ steps.version.outputs.version }}
-          
-          ### Installation
+          ## 🐦 FlappyBird Console Game v${{ steps.version.outputs.version }}
+
+          ### 🚀 Install & Play
           ```bash
           dotnet tool install --global FlappyBird
           flappybird
           ```
-          
-          ### Updates in this version
-          - See release notes in the package description
-          
-          ### How to play
-          - Press **SPACE** to fly
-          - Press **ESC** to quit
-          - Avoid the pipes!
+          > Requires .NET 10.0 Runtime · 80×24 terminal with color support
+
+          ### 🎮 What's New
+          See [CHANGELOG.md](https://github.com/TranDat1114/FlappyBird/blob/master/CHANGELOG.md) for the full list of changes.
+
+          ### 🕹️ Game Modes
+          | Mode | Description |
+          |------|-------------|
+          | Single Player | Classic Flappy Bird |
+          | Two Player | Local co-op split screen (P1: `Space`, P2: `Enter`) |
+          | Custom Game | Configure level, speed, and gap |
+          | Dual AI | Watch two AIs compete in a 10-round tournament |
+          | High Scores | Persistent leaderboard of your last 1 000 sessions |
+
+          ### ⚙️ Controls
+          - **Single Player**: `Space` to flap · `ESC` to quit · `R` to restart
+          - **Two Player**: `Space` (P1) · `Enter` (P2) · `ESC` to quit
+          - **Menus**: `↑↓` navigate · `Enter` confirm · `ESC` back
       env:
         GITHUB_TOKEN: ${{ secrets.ADMIN_TOKEN }}
 
@@ -98,7 +108,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 9.0.x
+        dotnet-version: 10.0.x
         
     - name: Test installation from NuGet
       run: |

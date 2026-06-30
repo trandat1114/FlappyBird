@@ -1,19 +1,23 @@
-using System.Collections.Generic;
-
 namespace FlappyBird.Models
 {
     /// <summary>
-    /// Class chứa tất cả trạng thái của game
+    /// All runtime game state. BirdState and DifficultyState are embedded here as
+    /// bridge properties (Phase 3 migration) — callers can start using them directly
+    /// and GameState flat properties will be removed once all modes are migrated.
     /// </summary>
     public class GameState
     {
-        // === GAME DIMENSIONS ===
-        public const int GameWidth = 80;
-        public const int GameHeight = 20;
-        public const int BirdX = 10;
-        
+        // Phase 3 bridge: structured sub-objects available now; flat properties kept for compat
+        public BirdState       Bird       { get; } = new();
+        public DifficultyState Difficulty { get; } = new();
+
+        // === GAME DIMENSIONS - PHÙ HỢP VỚI MENU DESIGN ===
+        public const int GameWidth = 78;  // Khớp với menu border width (panel 78, inner 76)
+        public const int GameHeight = 20; // 20 game rows + 4 footer = 24 rows (no header)
+        public const int BirdX = 8;       // Điều chỉnh vị trí chim phù hợp với width mới
+
         // === GAME STATE ===
-        public int BirdY { get; set; } = 8; // Vị trí khởi đầu ở giữa màn hình
+        public int BirdY { get; set; } = 10; // Vị trí khởi đầu ở giữa màn hình (20/2 = 10)
         public float BirdVelocity { get; set; } = 0f;
         public int Score { get; set; } = 0;
         public bool GameOver { get; set; } = false;
@@ -22,20 +26,29 @@ namespace FlappyBird.Models
         
         // === PHYSICS - CÂN BẰNG CHO KHUNG NHỎ 20x80 ===
         public const float Gravity = 0.06f; // Cân bằng: đủ nhanh để cảm thấy tự nhiên, đủ chậm để kiểm soát
-        public const float JumpStrength = -0.8f; // Giảm xuống: vừa đủ để vượt gap mà không bay quá cao
+        public const float JumpStrength = -0.7f; // Nhẹ hơn: kiểm soát tốt hơn, phù hợp gap tối thiểu 5
         public const float MaxFallSpeed = 1.0f; // Cân bằng: nhanh nhưng vẫn kiểm soát được
         
-        // === PIPES AND DIFFICULTY ===
+        // === PIPES AND DIFFICULTY - TỐI ƯU CHO WIDTH MỚI ===
         public List<Pipe> Pipes { get; set; } = new List<Pipe>();
-        public const int PipeSpacing = 42; // Tối ưu để chỉ có tối đa 2 ống trên màn hình
+        // Instance property (not const) so TwoPlayer can set a wider spacing to
+        // compensate for its 38-col panel (vs SP's 78-col game area, scale ≈0.49×).
+        public int PipeSpacing { get; set; } = 35;
         public int LastPipeX { get; set; } = GameWidth;
         public int DifficultyLevel { get; set; } = 1; // Bắt đầu từ level 1
-        public int PipeSpeed { get; set; } = 4; // Chậm hơn ban đầu để học
+        public int PipeSpeed { get; set; } = 3;
         
-        // === GAP SIZE ĐỘNG - TĂNG DẦN THEO SKILL ===
-        public const int BaseGapSize = 9; // Gap lớn ban đầu cho người mới
-        public const int MinGapSize = 6; // Gap tối thiểu vẫn chơi được
-        
+        // === GAP SIZE ĐỘNG - TỐI ƯU CHO HEIGHT MỚI ===
+        public const int BaseGapSize = 7; // Gap phù hợp cho height 20
+        public const int MinGapSize = 5;  // Gap tối thiểu vẫn chơi được
+
+        // === PHYSICS PRECISE POSITION ===
+        // BirdYf giữ vị trí float cho vật lý delta time; BirdY là int để render/collision
+        public float BirdYf { get; set; } = 10f;
+
+        // Bộ tích lũy thời gian di chuyển ống (giây), thay thế FrameCounter%PipeSpeed
+        public float PipeTimeAccumulator { get; set; } = 0f;
+
         // === ANIMATION & EFFECTS ===
         public int BirdAnimationFrame { get; set; } = 0;
         
@@ -66,71 +79,46 @@ namespace FlappyBird.Models
         /// </summary>
         public void Reset()
         {
-            BirdY = 8; // Vị trí giữa màn hình
-            BirdVelocity = 0f;
+            Bird.Reset();
+            Difficulty.Reset();
+
+            // Sync flat properties from sub-objects for backward compat
+            BirdY = Bird.Y;
+            BirdYf = Bird.Yf;
+            BirdVelocity = Bird.Velocity;
+            BirdAnimationFrame = Bird.AnimationFrame;
+            DifficultyLevel = Difficulty.Level;
+            PipeSpeed = Difficulty.PipeSpeed;
+
+            PipeTimeAccumulator = 0f;
             Score = 0;
             GameOver = false;
             GameStarted = false;
             FrameCounter = 0;
-            
-            // Reset difficulty về level 1
-            DifficultyLevel = 1;
-            PipeSpeed = 4; // Chậm nhất để bắt đầu
-            BirdAnimationFrame = 0;
-            
-            // Reset tracking variables cho rendering tối ưu
+
+            // Reset render tracking
             LastScore = 0;
             LastDifficultyLevel = 0;
             LastGameStarted = false;
             ForceFullRedraw = true;
-            
-            // Không reset GodMode, GodModeAutoRestart, GodModeAttempts, GodModeBestScore
-            // để giữ trạng thái qua các lần chơi
-            
-            // Clear pipes
+
             Pipes.Clear();
-            
-            // Reset màn hình buffer
+
             for (int y = 0; y < GameHeight; y++)
-            {
                 for (int x = 0; x < GameWidth; x++)
-                {
                     PreviousScreen[y, x] = ' ';
-                }
-            }
         }
         
-        /// <summary>
-        /// Cập nhật độ khó dựa trên điểm số
-        /// </summary>
         public void UpdateDifficulty()
         {
-            // Tăng level mỗi 5 điểm để có thời gian thích nghi
-            int newDifficultyLevel = (Score / 5) + 1;
-            
-            if (newDifficultyLevel != DifficultyLevel)
+            if (Difficulty.Update(Score))
             {
-                DifficultyLevel = newDifficultyLevel;
-                
-                // Pipe speed tăng dần
-                if (DifficultyLevel <= 2) PipeSpeed = 4;
-                else if (DifficultyLevel <= 4) PipeSpeed = 3;
-                else if (DifficultyLevel <= 6) PipeSpeed = 2;
-                else PipeSpeed = 1;
+                // Sync flat properties for callers still using them
+                DifficultyLevel = Difficulty.Level;
+                PipeSpeed       = Difficulty.PipeSpeed;
             }
         }
-        
-        /// <summary>
-        /// Tính gap size hiện tại dựa trên difficulty level
-        /// </summary>
-        public int GetCurrentGapSize()
-        {
-            // Level 1-3: Gap 9 (học cách chơi)
-            // Level 4-6: Gap 8 (trung bình) 
-            // Level 7-9: Gap 7 (khó)
-            // Level 10+: Gap 6 (chuyên nghiệp)
-            int currentGapSize = BaseGapSize - (DifficultyLevel / 3);
-            return System.Math.Max(MinGapSize, currentGapSize);
-        }
+
+        public int GetCurrentGapSize() => Difficulty.GapSize;
     }
 }

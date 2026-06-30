@@ -11,7 +11,7 @@ namespace FlappyBird.AI
     /// </summary>
     public static class GodModeAI
     {
-        private static List<SimplePattern> learnedPatterns = new List<SimplePattern>();
+        private static readonly List<SimplePattern> learnedPatterns = new();
         private static DateTime lastLearningUpdate = DateTime.MinValue;
         private static DateTime lastJumpTime = DateTime.MinValue;
         
@@ -194,6 +194,54 @@ namespace FlappyBird.AI
                 string gapInfo = nearestPipe != null ? $"Gap:{nearestPipe.GapSize},Dist:{nearestPipe.X - GameState.BirdX}" : "NoGap";
                 Console.SetCursorPosition(1, GameState.GameHeight + 2);
                 Console.Write($"AI: COASTING {gapInfo} (Y:{gameState.BirdY:F1}, V:{gameState.BirdVelocity:F2})".PadRight(80));
+            }
+        }
+        
+        /// <summary>
+        /// Aggressive AI strategy for comparison - jumps more frequently
+        /// </summary>
+        public static void AutoControlBirdAggressive(GameState gameState)
+        {
+            float jumpStrength = GameState.JumpStrength;
+            
+            // More aggressive safe zone - higher target
+            int aggressiveTarget = GameState.GameHeight / 2 - 1; // Higher than conservative
+            
+            // Jump more frequently with less safety margin
+            bool shouldJump = false;
+            
+            // Emergency situations
+            bool isEmergencyFloor = gameState.BirdY >= GameState.GameHeight - 2;
+            
+            if (isEmergencyFloor)
+            {
+                shouldJump = true;
+            }
+            else
+            {
+                // Aggressive positioning - jump when below target
+                if (gameState.BirdY > aggressiveTarget)
+                {
+                    shouldJump = true;
+                }
+                
+                // Pipe awareness but with less margin
+                var nearestPipe = gameState.Pipes.OrderBy(p => Math.Abs(p.X - GameState.BirdX)).FirstOrDefault();
+                if (nearestPipe != null && nearestPipe.X - GameState.BirdX < 8)
+                {
+                    int pipeGapCenter = (nearestPipe.TopHeight + (GameState.GameHeight - nearestPipe.BottomHeight)) / 2;
+                    if (gameState.BirdY > pipeGapCenter + 1) // Less safety margin
+                    {
+                        shouldJump = true;
+                    }
+                }
+            }
+            
+            // Throttle jumps but less than conservative
+            if (shouldJump && DateTime.Now - lastJumpTime > TimeSpan.FromMilliseconds(120)) // Faster than conservative
+            {
+                gameState.BirdVelocity = jumpStrength;
+                lastJumpTime = DateTime.Now;
             }
         }
         
