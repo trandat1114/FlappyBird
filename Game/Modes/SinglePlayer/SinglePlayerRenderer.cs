@@ -21,13 +21,10 @@ namespace FlappyBird.Game.Modes.SinglePlayer
         // === ASCII ART CHARACTERS ===
         private const char BirdChar = '♦';
         private const char PipeChar = '█';
-        private const char BorderH = '═';
-        private const char BorderV = '║';
-        private const char CornerTL = '╔';
-        private const char CornerTR = '╗';
-        private const char CornerBL = '╚';
-        private const char CornerBR = '╝';
-        private const char BgDot = '·';
+        private const char BgDot    = '·';
+
+        // Border chars cached per-frame from the active theme (avoids per-cell Settings lookup).
+        private static FlappyBird.UI.Border.BorderSet _bs = FlappyBird.UI.Border.BorderStyles.Double;
 
         // === PRE-ALLOCATED BUFFERS (không new mỗi frame) ===
         private readonly char[,] _screenBuf = new char[GameState.GameHeight, GameState.GameWidth];
@@ -47,6 +44,9 @@ namespace FlappyBird.Game.Modes.SinglePlayer
 
         public void Draw(GameState gs)
         {
+            // Refresh border chars from the active theme once per frame
+            _bs = GameSettings.Instance.GetBorderSet();
+
             // 1. Copy nền đã pre-compute (nhanh hơn nested loop ~5x)
             Buffer.BlockCopy(_bgBuf, 0, _screenBuf, 0,
                 GameState.GameHeight * GameState.GameWidth * sizeof(char));
@@ -118,11 +118,12 @@ namespace FlappyBird.Game.Modes.SinglePlayer
 
         private static void DrawBorders(char[,] buf)
         {
+            var bs = _bs;
             int w = GameState.GameWidth, h = GameState.GameHeight;
-            buf[0, 0] = CornerTL; buf[0, w - 1] = CornerTR;
-            buf[h - 1, 0] = CornerBL; buf[h - 1, w - 1] = CornerBR;
-            for (int x = 1; x < w - 1; x++) { buf[0, x] = BorderH; buf[h - 1, x] = BorderH; }
-            for (int y = 1; y < h - 1; y++) { buf[y, 0] = BorderV; buf[y, w - 1] = BorderV; }
+            buf[0, 0]         = bs.TopLeft;  buf[0, w - 1]     = bs.TopRight;
+            buf[h - 1, 0]     = bs.BotLeft;  buf[h - 1, w - 1] = bs.BotRight;
+            for (int x = 1; x < w - 1; x++) { buf[0, x]    = bs.Horiz; buf[h - 1, x] = bs.Horiz; }
+            for (int y = 1; y < h - 1; y++) { buf[y, 0]    = bs.Vert;  buf[y, w - 1] = bs.Vert; }
         }
 
         private static void DrawPipes(char[,] buf, GameState gs)
@@ -184,15 +185,23 @@ namespace FlappyBird.Game.Modes.SinglePlayer
                    originX: OriginX,
                    colorFn: CharColor);
 
-        private static ConsoleColor CharColor(char ch) => ch switch
+        private static ConsoleColor CharColor(char ch)
         {
-            '╔' or '╗' or '╚' or '╝' or '═' or '║' => GameSettings.Instance.PrimaryColor,
-            '█' or '▀' or '▄'                        => ConsoleColor.Green,
-            '♦' or '^'  or 'v'                        => ConsoleColor.Yellow,
-            '~' or '_'                                 => ConsoleColor.DarkYellow,
-            '·'                                        => ConsoleColor.DarkGray,
-            _                                          => ConsoleColor.DarkGray,
-        };
+            // Check against the currently-active border chars (respects theme BorderStyle)
+            var bs = _bs;
+            if (ch == bs.TopLeft || ch == bs.TopRight || ch == bs.BotLeft || ch == bs.BotRight
+                || ch == bs.Horiz || ch == bs.Vert)
+                return GameSettings.Instance.PrimaryColor;
+
+            return ch switch
+            {
+                '█' or '▀' or '▄' => ConsoleColor.Green,
+                '♦' or '^' or 'v' => ConsoleColor.Yellow,
+                '~' or '_'        => ConsoleColor.DarkYellow,
+                '·'               => ConsoleColor.DarkGray,
+                _                 => ConsoleColor.DarkGray,
+            };
+        }
 
         // ── FOOTER ──────────────────────────────────────────────────────────
 

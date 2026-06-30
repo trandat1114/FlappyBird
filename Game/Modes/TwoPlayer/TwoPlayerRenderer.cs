@@ -53,9 +53,10 @@ namespace FlappyBird.Game.Modes.TwoPlayer
         public void RenderDualPlayerFooterToBuffer(GameState p1, GameState p2)
         {
             var pc = GameSettings.Instance.PrimaryColor;
+            var bs = GameSettings.Instance.GetBorderSet();
 
             // Row 20: top border
-            WriteFooterBorderRow(FooterTopY, '╔', '╗', pc);
+            WriteFooterBorderRow(FooterTopY, bs.TopLeft, bs.TopRight, pc);
 
             // Row 21: P1/P2 status
             string s1 = p1.GameOver
@@ -72,7 +73,7 @@ namespace FlappyBird.Game.Modes.TwoPlayer
                 ConsoleColor.Gray, pc);
 
             // Row 23: bottom border (buffer flush handles last-row write)
-            WriteFooterBorderRow(FooterTopY + 3, '╚', '╝', pc);
+            WriteFooterBorderRow(FooterTopY + 3, bs.BotLeft, bs.BotRight, pc);
         }
 
         public void RenderCountdownOverlayToBuffer(int value)
@@ -99,35 +100,36 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             int iw  = InnerW;
             int gdh = GameDispH;
             var pc  = GameSettings.Instance.PrimaryColor;
+            var bs  = GameSettings.Instance.GetBorderSet();
 
             // Row 0: top border with centred label
-            string topInner = BuildTopInner(label, iw);
-            _buf.WriteToBuffer(xOff,                  0, '╔', pc);
+            string topInner = BuildTopInner(label, iw, bs.Horiz);
+            _buf.WriteToBuffer(xOff,              0, bs.TopLeft,  pc);
             for (int x = 0; x < iw; x++)
-                _buf.WriteToBuffer(xOff + 1 + x,      0, topInner[x], pc);
-            _buf.WriteToBuffer(xOff + PanelW - 1,     0, '╗', pc);
+                _buf.WriteToBuffer(xOff + 1 + x,  0, topInner[x], pc);
+            _buf.WriteToBuffer(xOff + PanelW - 1, 0, bs.TopRight, pc);
 
             // Rows 1..gdh: game content
             BuildGameContent(gameBuf, gs, gdh, iw);
-            FlushContent(gameBuf, xOff, gdh, iw);
+            FlushContent(gameBuf, xOff, gdh, iw, bs.Vert, pc);
 
             if (gs.GameOver)
                 WriteOverlay(xOff + 1, 1 + gdh / 2, iw, "GAME OVER!", ConsoleColor.Red);
 
             // Row 19: bottom border
             int botRow = BotBorderY;
-            _buf.WriteToBuffer(xOff,                  botRow, '╚', pc);
+            _buf.WriteToBuffer(xOff,              botRow, bs.BotLeft,  pc);
             for (int x = 1; x < PanelW - 1; x++)
-                _buf.WriteToBuffer(xOff + x,          botRow, '═', pc);
-            _buf.WriteToBuffer(xOff + PanelW - 1,     botRow, '╝', pc);
+                _buf.WriteToBuffer(xOff + x,      botRow, bs.Horiz,    pc);
+            _buf.WriteToBuffer(xOff + PanelW - 1, botRow, bs.BotRight, pc);
         }
 
-        private static string BuildTopInner(string label, int innerW)
+        private static string BuildTopInner(string label, int innerW, char horiz)
         {
             string lbl      = $" {label} ";
             int    padLeft  = (innerW - lbl.Length) / 2;
             int    padRight = innerW - padLeft - lbl.Length;
-            return new string('═', padLeft) + lbl + new string('═', padRight);
+            return new string(horiz, padLeft) + lbl + new string(horiz, padRight);
         }
 
         // ── GAME BUFFERS ─────────────────────────────────────────────────────
@@ -197,15 +199,14 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             }
         }
 
-        private void FlushContent(char[,] buf, int xOff, int gdh, int iw)
+        private void FlushContent(char[,] buf, int xOff, int gdh, int iw, char vert, ConsoleColor pc)
         {
-            var pc = GameSettings.Instance.PrimaryColor;
             for (int y = 0; y < gdh; y++)
             {
-                _buf.WriteToBuffer(xOff,               y + 1, '║', pc);
+                _buf.WriteToBuffer(xOff,              y + 1, vert,        pc);
                 for (int x = 0; x < iw; x++)
-                    _buf.WriteToBuffer(xOff + 1 + x,   y + 1, buf[y, x], CharColor(buf[y, x]));
-                _buf.WriteToBuffer(xOff + PanelW - 1,  y + 1, '║', pc);
+                    _buf.WriteToBuffer(xOff + 1 + x,  y + 1, buf[y, x],  CharColor(buf[y, x]));
+                _buf.WriteToBuffer(xOff + PanelW - 1, y + 1, vert,        pc);
             }
         }
 
@@ -213,16 +214,18 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private void WriteFooterBorderRow(int row, char left, char right, ConsoleColor pc)
         {
-            int w = ConsoleW;
+            var bs = GameSettings.Instance.GetBorderSet();
+            int w  = ConsoleW;
             _buf.WriteToBuffer(0, row, left, pc);
-            for (int x = 1; x < w - 1; x++) _buf.WriteToBuffer(x, row, '═', pc);
+            for (int x = 1; x < w - 1; x++) _buf.WriteToBuffer(x, row, bs.Horiz, pc);
             _buf.WriteToBuffer(w - 1, row, right, pc);
         }
 
         private void WriteFooterContentRow(int row, string text, ConsoleColor fg, ConsoleColor pc)
         {
-            int w = ConsoleW;
-            _buf.WriteToBuffer(0, row, '║', pc);
+            var bs = GameSettings.Instance.GetBorderSet();
+            int w  = ConsoleW;
+            _buf.WriteToBuffer(0, row, bs.Vert, pc);
             for (int x = 1; x < w - 1; x++)
             {
                 int ti = x - 1;
@@ -230,7 +233,7 @@ namespace FlappyBird.Game.Modes.TwoPlayer
                     ti < text.Length ? text[ti] : ' ',
                     ti < text.Length ? fg : ConsoleColor.DarkGray);
             }
-            _buf.WriteToBuffer(w - 1, row, '║', pc);
+            _buf.WriteToBuffer(w - 1, row, bs.Vert, pc);
         }
 
         // ── OVERLAYS ─────────────────────────────────────────────────────────

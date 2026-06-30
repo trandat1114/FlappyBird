@@ -26,7 +26,15 @@ public static class CustomGameMenu
     public static CustomGameConfig? Show()
     {
         Console.CursorVisible = false;
-        _cfg = new CustomGameConfig();
+        // Restore last-used config so the player doesn't have to re-configure every time
+        var last = GameSettings.Instance.LastCustomGame;
+        _cfg = new CustomGameConfig
+        {
+            ManualMode  = last.ManualMode,
+            StartLevel  = last.StartLevel,
+            ManualSpeed = last.ManualSpeed,
+            ManualGap   = last.ManualGap,
+        };
         _row = 0;
         Draw();
 

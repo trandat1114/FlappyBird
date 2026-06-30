@@ -6,6 +6,7 @@ public enum MenuAction
     SinglePlayer,
     TwoPlayer,
     CustomGame,
+    HighScores,
     DualAI,
     SplitScreenAI,
     AITournament,

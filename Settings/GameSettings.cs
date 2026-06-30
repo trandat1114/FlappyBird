@@ -1,4 +1,5 @@
 using FlappyBird.Localization;
+using FlappyBird.Models;
 using FlappyBird.UI;
 using FlappyBird.UI.Border;
 
@@ -25,6 +26,9 @@ public class GameSettings
     public string FontFaceName { get; set; } = "";
     /// <summary>Console font cell height in pixels.</summary>
     public int    FontSize     { get; set; } = 16;
+
+    /// <summary>Last-used Custom Game configuration — persisted to settings.json.</summary>
+    public CustomGameConfig LastCustomGame { get; set; } = new();
 
     /// <summary>Derived from colors+border — returns "Custom" when no preset matches.</summary>
     public string CurrentThemeName =>

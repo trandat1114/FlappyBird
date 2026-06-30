@@ -23,6 +23,8 @@ namespace FlappyBird.Game.Modes
         private readonly SinglePlayerInputHandler inputHandler;
         private readonly SinglePlayerInitializer initializer;
 
+        private bool _scoreSaved = false;
+
         // === CONSTRUCTOR ===
         public SinglePlayerGameMode(CustomGameConfig? config = null)
         {
@@ -84,6 +86,11 @@ namespace FlappyBird.Game.Modes
             // Kiểm tra game over và hiển thị menu thay vì thoát ngay
             if (gameState.GameOver && !gameOverMenu.ShowGameOverMenu)
             {
+                if (!_scoreSaved)
+                {
+                    SaveScore();
+                    _scoreSaved = true;
+                }
                 gameOverMenu.StartGameOverMenu();
             }
         }
@@ -194,11 +201,31 @@ namespace FlappyBird.Game.Modes
             gameState.BirdVelocity = GameState.JumpStrength;
         }
 
+        private void SaveScore()
+        {
+            string mode = _config != null ? "CustomGame" : "SinglePlayer";
+            var entry   = new ScoreEntry
+            {
+                Mode     = mode,
+                Score    = gameState.Score,
+                PlayedAt = DateTime.Now,
+            };
+            if (_config != null)
+            {
+                entry.ManualMode  = _config.ManualMode;
+                entry.StartLevel  = _config.ManualMode ? null : _config.StartLevel;
+                entry.ManualSpeed = _config.ManualMode ? _config.ManualSpeed : null;
+                entry.ManualGap   = _config.ManualMode ? _config.ManualGap   : null;
+            }
+            ScoreRepository.Add(entry);
+        }
+
         /// <summary>
         /// Restart game với cùng cài đặt
         /// </summary>
         private void RestartGame()
         {
+            _scoreSaved = false;
             // Reset state BEFORE clearing show flag so game loop never sees
             // ShowGameOverMenu=false with old pipes still in the list.
             gameState.Reset();

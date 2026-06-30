@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FlappyBird.Localization;
+using FlappyBird.Models;
 using FlappyBird.UI.Border;
 
 namespace FlappyBird.Settings;
@@ -23,16 +24,21 @@ public static class SettingsSerializer
 
     private sealed class Dto
     {
-        public string Language      { get; set; } = "English";
-        public int    TargetFps     { get; set; } = 60;
-        public bool   MusicEnabled  { get; set; } = true;
-        public int    MusicVolume   { get; set; } = 80;
-        public int    EffectsVolume { get; set; } = 60;
-        public string BorderStyle   { get; set; } = "Double";
-        public string PrimaryColor  { get; set; } = "Cyan";
-        public string AccentColor   { get; set; } = "Yellow";
-        public string FontFaceName  { get; set; } = "";
-        public int    FontSize      { get; set; } = 16;
+        public string Language           { get; set; } = "English";
+        public int    TargetFps          { get; set; } = 60;
+        public bool   MusicEnabled       { get; set; } = true;
+        public int    MusicVolume        { get; set; } = 80;
+        public int    EffectsVolume      { get; set; } = 60;
+        public string BorderStyle        { get; set; } = "Double";
+        public string PrimaryColor       { get; set; } = "Cyan";
+        public string AccentColor        { get; set; } = "Yellow";
+        public string FontFaceName       { get; set; } = "";
+        public int    FontSize           { get; set; } = 16;
+        // Custom Game last-used config
+        public bool   CustomManualMode   { get; set; } = false;
+        public int    CustomStartLevel   { get; set; } = 1;
+        public int    CustomManualSpeed  { get; set; } = 3;
+        public int    CustomManualGap    { get; set; } = 7;
     }
 
     public static void Save(GameSettings s)
@@ -51,8 +57,12 @@ public static class SettingsSerializer
                 BorderStyle   = s.BorderStyle.ToString(),
                 PrimaryColor  = s.PrimaryColor.ToString(),
                 AccentColor   = s.AccentColor.ToString(),
-                FontFaceName  = s.FontFaceName,
-                FontSize      = s.FontSize,
+                FontFaceName      = s.FontFaceName,
+                FontSize          = s.FontSize,
+                CustomManualMode  = s.LastCustomGame.ManualMode,
+                CustomStartLevel  = s.LastCustomGame.StartLevel,
+                CustomManualSpeed = s.LastCustomGame.ManualSpeed,
+                CustomManualGap   = s.LastCustomGame.ManualGap,
             };
             File.WriteAllText(FilePath, JsonSerializer.Serialize(dto, _opts));
         }
@@ -77,6 +87,13 @@ public static class SettingsSerializer
             s.EffectsVolume = Math.Clamp(dto.EffectsVolume, 0, 100);
             s.FontFaceName  = dto.FontFaceName ?? "";
             s.FontSize      = Math.Clamp(dto.FontSize, 8, 72);
+            s.LastCustomGame = new CustomGameConfig
+            {
+                ManualMode  = dto.CustomManualMode,
+                StartLevel  = Math.Clamp(dto.CustomStartLevel,  1, 10),
+                ManualSpeed = Math.Clamp(dto.CustomManualSpeed, 1, 4),
+                ManualGap   = Math.Clamp(dto.CustomManualGap,   GameState.MinGapSize, GameState.BaseGapSize + 3),
+            };
             s.Apply();
         }
         catch { /* corrupt/outdated file — leave defaults intact */ }

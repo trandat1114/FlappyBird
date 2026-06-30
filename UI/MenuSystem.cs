@@ -16,15 +16,16 @@ namespace FlappyBird.UI
             L.Get(L.MENU_SINGLE_PLAYER),    // 1
             L.Get(L.MENU_TWO_PLAYER),       // 2
             "       Custom Game",            // 3
-            "",                              // 4  spacer
-            L.Get(L.MENU_SECTION_AI),       // 5  header
-            "       Dual AI Comparison",     // 6
-            "       Split Screen Real-time", // 7
-            "       AI Tournament",          // 8
-            "",                              // 9  spacer
-            L.Get(L.MENU_SETTINGS),         // 10
-            "",                              // 11 spacer
-            L.Get(L.MENU_QUIT),             // 12
+            "       High Scores",            // 4
+            "",                              // 5  spacer
+            L.Get(L.MENU_SECTION_AI),       // 6  header
+            "       Dual AI Comparison",     // 7
+            "       Split Screen Real-time", // 8
+            "       AI Tournament",          // 9
+            "",                              // 10 spacer
+            L.Get(L.MENU_SETTINGS),         // 11
+            "",                              // 12 spacer
+            L.Get(L.MENU_QUIT),             // 13
         ];
 
         private static readonly MenuAction[] menuActions = [
@@ -32,6 +33,7 @@ namespace FlappyBird.UI
             MenuAction.SinglePlayer,
             MenuAction.TwoPlayer,
             MenuAction.CustomGame,
+            MenuAction.HighScores,
             MenuAction.None,
             MenuAction.None,
             MenuAction.DualAI,
@@ -44,7 +46,7 @@ namespace FlappyBird.UI
         ];
 
         private static readonly bool[] selectable = [
-            false, true, true, true, false, false, true, true, true, false, true, false, true
+            false, true, true, true, true, false, false, true, true, true, false, true, false, true
         ];
 
         // ── Public entry point ────────────────────────────────────────────────
@@ -127,8 +129,8 @@ namespace FlappyBird.UI
             Console.ForegroundColor = ConsoleColor.Gray;
             Console.WriteLine(panel.BuildRow("  ↑↓: Select   Enter: Confirm   ESC: Exit"));
 
-            // Empty rows to pad menu to 24 rows (rows 18-22)
-            for (int i = 0; i < 5; i++)
+            // Empty rows to pad menu to 24 rows (rows 19-22)
+            for (int i = 0; i < 4; i++)
             {
                 Console.ForegroundColor = panel.BorderColor;
                 Console.WriteLine(panel.BuildEmptyRow());
@@ -230,14 +232,14 @@ namespace FlappyBird.UI
         private static ConsoleColor ItemColor(int i)
         {
             if (!selectable[i])
-                return (i == 0 || i == 5) ? ConsoleColor.Green : ConsoleColor.DarkGray;
+                return (i == 0 || i == 6) ? ConsoleColor.Green : ConsoleColor.DarkGray;
 
             return i switch
             {
-                1 or 2 or 3 => ConsoleColor.Cyan,
-                6 or 7 or 8 => ConsoleColor.Magenta,
-                12          => ConsoleColor.Red,
-                _           => ConsoleColor.White,
+                1 or 2 or 3 or 4 => ConsoleColor.Cyan,
+                7 or 8 or 9      => ConsoleColor.Magenta,
+                13               => ConsoleColor.Red,
+                _                => ConsoleColor.White,
             };
         }
 

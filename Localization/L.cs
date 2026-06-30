@@ -112,7 +112,7 @@ public static class L
             [MENU_SECTION_HUMAN] = "   HUMAN PLAYERS",
             [MENU_SINGLE_PLAYER] = "       Single Player",
             [MENU_TWO_PLAYER]    = "       Two Players(In development)",
-            [MENU_SECTION_AI]    = "   AI TRAINING",
+            [MENU_SECTION_AI]    = "   AI TRAINING(In development)",
             [MENU_QUIT]          = "   Quit",
             [MENU_CTRL_LABEL]    = "│    Controls     :                                              │",
             [MENU_CTRL_MOVE]     = "│    ↑ ↓          : Move selection                               │",

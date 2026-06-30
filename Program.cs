@@ -82,10 +82,18 @@ class FlappyBirdGame
                     GameEngine.StartGame(GameModeFactory.MenuActionToGameMode(menuAction));
                     break;
 
+                case MenuAction.HighScores:
+                    HighScoreMenu.Show();
+                    break;
+
                 case MenuAction.CustomGame:
                     CustomGameConfig? cfg = CustomGameMenu.Show();
                     if (cfg != null)
+                    {
+                        GameSettings.Instance.LastCustomGame = cfg;
+                        SettingsSerializer.Save(GameSettings.Instance);
                         GameEngine.StartGame(GameMode.SinglePlayer, cfg);
+                    }
                     break;
 
                 case MenuAction.Settings:

@@ -1,5 +1,6 @@
 using FlappyBird.Localization;
 using FlappyBird.Models;
+using FlappyBird.Settings;
 
 namespace FlappyBird.Game.Modes.TwoPlayer
 {
@@ -62,8 +63,10 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             var    bc       = ConsoleColor.Red;
             int    ftop     = FooterTopY;
 
-            // Row 20: top border (red)
-            WriteBorderRow(ftop, '╔', '╗', bc);
+            var bs = GameSettings.Instance.GetBorderSet();
+
+            // Row 20: top border (red, style from theme)
+            WriteBorderRow(ftop, bs.TopLeft, bs.TopRight, bc);
 
             // Row 21: result info
             string result = isTie
@@ -78,8 +81,8 @@ namespace FlappyBird.Game.Modes.TwoPlayer
             string opt1 = (sel1 ? " ► " : "   ") + opts[1];
             WriteOptionsRow(ftop + 2, opt0, sel0, opt1, sel1, bc);
 
-            // Row 23: bottom border (red)
-            WriteBorderRow(ftop + 3, '╚', '╝', bc);
+            // Row 23: bottom border (red, style from theme)
+            WriteBorderRow(ftop + 3, bs.BotLeft, bs.BotRight, bc);
         }
 
         // ── Input ────────────────────────────────────────────────────────────
@@ -126,16 +129,18 @@ namespace FlappyBird.Game.Modes.TwoPlayer
 
         private void WriteBorderRow(int row, char left, char right, ConsoleColor c)
         {
-            int w = ConsoleW;
+            var bs = GameSettings.Instance.GetBorderSet();
+            int w  = ConsoleW;
             _buf.WriteToBuffer(0, row, left, c);
-            for (int x = 1; x < w - 1; x++) _buf.WriteToBuffer(x, row, '═', c);
+            for (int x = 1; x < w - 1; x++) _buf.WriteToBuffer(x, row, bs.Horiz, c);
             _buf.WriteToBuffer(w - 1, row, right, c);
         }
 
         private void WriteContentRow(int row, string text, ConsoleColor fg, ConsoleColor bc)
         {
-            int w = ConsoleW;
-            _buf.WriteToBuffer(0, row, '║', bc);
+            var bs = GameSettings.Instance.GetBorderSet();
+            int w  = ConsoleW;
+            _buf.WriteToBuffer(0, row, bs.Vert, bc);
             for (int x = 1; x < w - 1; x++)
             {
                 int ti = x - 1;
@@ -143,18 +148,19 @@ namespace FlappyBird.Game.Modes.TwoPlayer
                     ti < text.Length ? text[ti] : ' ',
                     ti < text.Length ? fg : ConsoleColor.DarkGray);
             }
-            _buf.WriteToBuffer(w - 1, row, '║', bc);
+            _buf.WriteToBuffer(w - 1, row, bs.Vert, bc);
         }
 
         private void WriteOptionsRow(int row, string opt0, bool sel0, string opt1, bool sel1, ConsoleColor bc)
         {
+            var bs = GameSettings.Instance.GetBorderSet();
             int w     = ConsoleW;
             int inner = w - 2;
             int leftW = inner / 2;           // 39 at width=80
             int sepCol = 1 + leftW;          // 40
             int rightStart = sepCol + 1;     // 41
 
-            _buf.WriteToBuffer(0, row, '║', bc);
+            _buf.WriteToBuffer(0, row, bs.Vert, bc);
 
             // Left option
             var c0 = sel0 ? ConsoleColor.Yellow : ConsoleColor.Gray;
@@ -176,7 +182,7 @@ namespace FlappyBird.Game.Modes.TwoPlayer
                 _buf.WriteToBuffer(rightStart + i, row, ch, i < opt1.Length ? c1 : ConsoleColor.DarkGray);
             }
 
-            _buf.WriteToBuffer(w - 1, row, '║', bc);
+            _buf.WriteToBuffer(w - 1, row, bs.Vert, bc);
         }
     }
 
