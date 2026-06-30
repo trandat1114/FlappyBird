@@ -34,19 +34,19 @@ jobs:
     - name: Get version from tag
       id: version
       run: |
-        TAG_NAME=${GITHUB_REF#refs/tags/}
-        VERSION=${TAG_NAME#v}
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+        else
+          VERSION="0.0.0-dev"
+        fi
         echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Set version output
-      id: set-version
-      run: echo "::set-output name=version::${{ steps.version.outputs.version }}"
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        
     - name: Update package version
       run: |
-        sed -i "s/<Version>.*<\/Version>/<Version>${{ steps.version.outputs.version }}<\/Version>/" FlappyBird.csproj
-        
+        # Use | as sed delimiter to avoid conflicts with / in version strings
+        sed -i "s|<Version>.*</Version>|<Version>${{ steps.version.outputs.version }}</Version>|" FlappyBird.csproj
+
     - name: Re-pack with correct version
       run: dotnet pack FlappyBird.csproj -c Release --verbosity normal
       
