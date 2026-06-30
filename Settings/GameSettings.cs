@@ -15,8 +15,8 @@ public class GameSettings
 
     public Language     Language      { get; set; } = Language.English;
     public int          TargetFps     { get; set; } = 60;   // 60 or 120
-    public bool         MusicEnabled  { get; set; } = true;
-    public int          MusicVolume   { get; set; } = 80;   // 0-100 step 10
+    public bool         MusicEnabled  { get; set; } = false;
+    public int          MusicVolume   { get; set; } = 0;   // 0-100 step 10
     public int          EffectsVolume { get; set; } = 60;   // 0-100 step 10
     public BorderStyle  BorderStyle   { get; set; } = BorderStyle.Double;
     public ConsoleColor PrimaryColor  { get; set; } = ConsoleColor.Cyan;
